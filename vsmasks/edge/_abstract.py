@@ -9,7 +9,7 @@ from vstools import core, vs
 from ..util import max_expr
 
 __all__ = [
-    'EdgeDetect',
+    'EdgeDetect', 'EdgeDetectT',
     'MatrixEdgeDetect',
     'SingleMatrix',
     'EuclidianDistance',
@@ -259,3 +259,6 @@ class Max(MatrixEdgeDetect, ABC):
 
     def _merge_ridge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode | NoReturn:
         raise NotImplementedError
+
+
+EdgeDetectT: TypeAlias = type[EdgeDetect] | EdgeDetect | str
