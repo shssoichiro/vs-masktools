@@ -1,10 +1,5 @@
-"""
-Various masking tools for Vapoursynth
-"""
-# flake8: noqa
-
-import warnings
-
-from . import edge, util
-
-warnings.simplefilter('always', DeprecationWarning)
+from .details import *  # noqa: F401, F403
+from .funcs import *  # noqa: F401, F403
+from .morpho import *  # noqa: F401, F403
+from .types import *  # noqa: F401, F403
+from .utils import *  # noqa: F401, F403
