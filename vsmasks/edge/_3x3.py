@@ -8,7 +8,8 @@ from typing import NoReturn, Sequence
 
 from vstools import ColorRange, depth, get_depth, join, split, vs
 
-from ..util import XxpandMode, expand, inpand
+from ..types import XxpandMode
+from ..morpho import Morpho
 from ._abstract import EdgeDetect, EuclidianDistance, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
 
 __all__ = [
@@ -347,11 +348,11 @@ class MinMax(EdgeDetect):
     def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
         assert clip.format
         planes = [
-            vs.core.std.Expr(
-                [expand(p, rad, rad, XxpandMode.ELLIPSE),
-                 inpand(p, rad, rad, XxpandMode.ELLIPSE)],
-                'x y -')
-            for p, rad in zip(split(clip), self.radii)
+            vs.core.std.Expr([
+                Morpho.expand(p, rad, rad, XxpandMode.ELLIPSE),
+                Morpho.inpand(p, rad, rad, XxpandMode.ELLIPSE)],
+                'x y -'
+            ) for p, rad in zip(split(clip), self.radii)
         ]
         return join(planes, clip.format.color_family)
 
