@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import ClassVar, NoReturn, Sequence, cast
+from typing import ClassVar, NoReturn, Sequence, TypeAlias, cast
 
-from vstools import core, vs
-
-from ..util import max_expr
+from vstools import StrList, core, vs, check_variable
+from vsexprtools import ExprOp, ExprVars
 
 __all__ = [
     'EdgeDetect', 'EdgeDetectT',
@@ -28,10 +27,7 @@ class EdgeDetect(ABC):
     _bits: int
 
     def edgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
+        self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
     ) -> vs.VideoNode:
         """
@@ -77,8 +73,7 @@ class EdgeDetect(ABC):
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
         feature: _Feature = _Feature.EDGE
     ) -> vs.VideoNode:
-        if not clip.format:
-            raise ValueError('Variable format not allowed!')
+        assert check_variable(clip, self.__class__)
 
         self._bits = clip.format.bits_per_sample
         is_float = clip.format.sample_type == vs.FLOAT
@@ -246,16 +241,13 @@ class EuclidianDistance(MatrixEdgeDetect, ABC):
 
 class Max(MatrixEdgeDetect, ABC):
     def ridgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
+        self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None,
+        multi: float = 1.0, clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
     ) -> vs.VideoNode | NoReturn:
         raise NotImplementedError
 
     def _merge_edge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
-        return core.std.Expr(clips, max_expr(len(clips)))
+        return ExprOp.MAX.combine(*clips)
 
     def _merge_ridge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode | NoReturn:
         raise NotImplementedError
