@@ -2,16 +2,16 @@
 API Reference
 =============
 
-.. automodule:: vsmask
+.. automodule:: vsmasks
 
 Edge Masks
 ==========
-.. automodule:: vsmask.edge
+.. automodule:: vsmasks.edge
    :members:
    :inherited-members:
    :show-inheritance:
 
 Utility functions
 =================
-.. automodule:: vsmask.util
+.. automodule:: vsmasks.util
    :members:

@@ -1,13 +1,13 @@
-# vsmask
-VSMask aims to provide tools and functions to manage, create, and manipulate masks in VapourSynth.
+# vs-masks
+vs-masks aims to provide tools and functions to manage, create, and manipulate masks in VapourSynth.
 
 For further support, please leave any questions in the [IEW Discord server](https://discord.gg/qxTxVJGtst).
 
 
 # Installation
-vsmask is available on PyPi and can be installed with this simple command:
+vs-masks is available on PyPi and can be installed with this simple command:
 ```
-pip install vsmask
+pip install vsmasks
 ```
 
 # Dependencies 

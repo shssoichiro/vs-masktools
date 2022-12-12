@@ -19,7 +19,7 @@ author = 'IEW'
 
 # The full version, including alpha/beta/rc tags
 meta: Dict[str, Any] = {}
-with Path('../vsmask/_metadata.py').resolve().open() as f:
+with Path('../vsmasks/_metadata.py').resolve().open() as f:
     exec(f.read(), meta)
 
 version = release = meta['__version__']
@@ -71,10 +71,7 @@ autodoc_mock_imports = [
 smartquotes = True                                      # https://www.sphinx-doc.org/en/master/usage/configuration.html?highlight=smartquotes#confval-smartquotes
 html_show_sphinx = False                                # https://www.sphinx-doc.org/en/master/usage/configuration.html?highlight=smartquotes#confval-html_show_sphinx
 pygments_style = 'sphinx'                               # https://www.sphinx-doc.org/en/master/usage/configuration.html?highlight=pygments_style#confval-pygments_style
-autodoc_type_aliases = {                                # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autodoc_type_aliases
-    'MorphoFunc': 'vsmask.types.MorphoFunc',
-    'ZResizer': 'vsmask.types.ZResizer',
-}
+autodoc_type_aliases = {}                               # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autodoc_type_aliases
 autodoc_preserve_defaults = True                        # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autodoc_preserve_defaults
 
 # -- Options for todo extension ----------------------------------------------
