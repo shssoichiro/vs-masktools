@@ -1,17 +1,35 @@
 from __future__ import annotations
+from typing import Iterable
 
-from vsexprtools import aka_expr_available, norm_expr
+from vsexprtools import ExprOp, aka_expr_available, norm_expr
+from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
-from vstools import (
-    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable, get_peak_value, insert_clip,
-    replace_ranges, vs
-)
+from vstools import (CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable,
+                     check_variable_format, flatten, get_peak_value, insert_clip, replace_ranges, split, vs)
 
 __all__ = [
+    'max_planes',
+
     'squaremask',
     'replace_squaremask',
     'freeze_replace_squaremask',
 ]
+
+
+
+def max_planes(*_clips: vs.VideoNode | Iterable[vs.VideoNode], resizer: KernelT = Bilinear) -> vs.VideoNode:
+    clips = list[vs.VideoNode](flatten(_clips))  # type: ignore
+
+    assert check_variable_format((model := clips[0]), max_planes)
+
+    resizer = Kernel.ensure_obj(resizer, max_planes)
+
+    width, height, fmt = model.width, model.height, model.format.replace(subsampling_w=0, subsampling_h=0)
+
+    return ExprOp.MAX.combine(
+        split(resizer.scale(clip, width, height, format=fmt)) for clip in clips
+    )
+
 
 def squaremask(
     clip: vs.VideoNode, width: int, height: int, offset_x: int, offset_y: int, invert: bool = False,
