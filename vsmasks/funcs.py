@@ -95,7 +95,7 @@ def retinex(
 
     msr = norm_expr([luma_float, (gauss_blur(luma_float, i) for i in sigma)], expr_msr)
 
-    msr_stats = msr.psm.PlaneMinMax(lower_thr, upper_thr)  # type: ignore
+    msr_stats = msr.psm.PlaneMinMax(lower_thr, upper_thr)
 
     expr_balance = "x x.psmMin - x.psmMax x.psmMin - /"
 

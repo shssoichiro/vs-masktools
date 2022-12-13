@@ -13,7 +13,6 @@ __all__ = [
     'freeze_replace_squaremask',
 ]
 
-
 def squaremask(
     clip: vs.VideoNode, width: int, height: int, offset_x: int, offset_y: int, invert: bool = False,
     func: FuncExceptT | None = None
