@@ -184,26 +184,6 @@ class Morpho:
 
         return clip
 
-    @inject_self
-    @copy_signature(__minmax_method)
-    def maximum(
-        self, src: vs.VideoNode, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
-        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        return self.dilation(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
-
-    @inject_self
-    @copy_signature(__minmax_method)
-    def minimum(
-        self, src: vs.VideoNode, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
-        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        return self.erosion(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
-
     def _xxflate(
         self: Morpho, inflate: bool, src: vs.VideoNode, radius: int, planes: PlanesT, thr: int | float | None,
         multiply: float | None, *, func: FuncExceptT
@@ -229,6 +209,26 @@ class Morpho:
             expr.append(multiply, ExprOp.MUL)
 
         return norm_expr(src, expr, planes)
+
+    @inject_self
+    @copy_signature(__minmax_method)
+    def maximum(
+        self, src: vs.VideoNode, thr: int | float | None = None,
+        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
+        *, func: FuncExceptT | None = None, **kwargs: Any
+    ) -> vs.VideoNode:
+        return self.dilation(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
+
+    @inject_self
+    @copy_signature(__minmax_method)
+    def minimum(
+        self, src: vs.VideoNode, thr: int | float | None = None,
+        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
+        *, func: FuncExceptT | None = None, **kwargs: Any
+    ) -> vs.VideoNode:
+        return self.erosion(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
 
     @inject_self
     def inflate(
