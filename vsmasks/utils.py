@@ -3,7 +3,8 @@ from __future__ import annotations
 from vsexprtools import aka_expr_available, norm_expr
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
-    FrameRangeN, FrameRangesN, FuncExceptT, check_variable, get_peak_value, insert_clip, replace_ranges, vs
+    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable, get_peak_value, insert_clip,
+    replace_ranges, vs
 )
 
 __all__ = [
@@ -22,6 +23,9 @@ def squaremask(
     assert check_variable(clip, func)
 
     mask_format = clip.format.replace(color_family=vs.GRAY, subsampling_w=0, subsampling_h=0)
+
+    if offset_x + width > clip.width or offset_y + height > clip.height:
+        raise CustomValueError('mask exceeds clip size!')
 
     if aka_expr_available:
         base_clip = clip.std.BlankClip(mask_format.id, 1, color=0, keep=True)
