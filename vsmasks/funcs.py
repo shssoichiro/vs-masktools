@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 from vsexprtools import ExprOp, ExprVars, aka_expr_available, norm_expr
 from vsrgtools import gauss_blur
 from vstools import (
@@ -51,7 +53,7 @@ def adg_mask(
 
 
 def retinex(
-    clip: vs.VideoNode, sigma: list[float] = [25, 80, 250],
+    clip: vs.VideoNode, sigma: Sequence[float] = [25, 80, 250],
     lower_thr: float = 0.001, upper_thr: float = 0.001,
     fast: bool = False, func: FuncExceptT | None = None
 ) -> vs.VideoNode:
