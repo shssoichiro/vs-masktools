@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from typing import Any, Literal, Sequence
 
-from vsexprtools import ExprOp, aka_expr_available, norm_expr
+from vsexprtools import ExprOp, ExprToken, aka_expr_available, norm_expr
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
@@ -22,6 +22,14 @@ __all__ = [
 def __minmax_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
     coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
+    iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
+    *, func: FuncExceptT | None = None, **kwargs: Any
+) -> vs.VideoNode:
+    ...
+
+
+def __xxflate_method(  # type: ignore
+    self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
     iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -206,6 +214,42 @@ class Morpho:
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
         return self.erosion(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
+
+    def _xxflate(
+        self: Morpho, inflate: bool, src: vs.VideoNode, radius: int, planes: PlanesT, thr: int | float | None,
+        multiply: float | None, *, func: FuncExceptT
+    ) -> vs.VideoNode:
+        assert check_variable(src, func)
+
+        expr = ExprOp.matrix('x', radius, exclude=[(0, 0)])
+
+        conv_len = len(expr)
+
+        if src.format.sample_type is vs.INTEGER:
+            expr.append(radius * 4, ExprOp.ADD)
+
+        expr.append(conv_len, ExprOp.DIV)
+        expr.append('x', ExprOp.MAX if inflate else ExprOp.MIN)
+
+        if thr is not None:
+            limit = ['x', thr, ExprOp.ADD] if inflate else ['x', thr, ExprOp.SUB, ExprToken.RangeMin, ExprOp.MAX]
+
+        expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
+
+        if multiply is not None:
+            expr.append(multiply, ExprOp.MUL)
+
+        return norm_expr(src, expr, planes)
+
+    @inject_self
+    @copy_signature(__xxflate_method)
+    def inflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        return self._xxflate(True, *args, func=func or self.inflate, **kwargs)
+
+    @inject_self
+    @copy_signature(__xxflate_method)
+    def deflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        return self._xxflate(False, *args, func=func or self.deflate, **kwargs)
 
     @inject_self
     @copy_signature(__morpho_method)
