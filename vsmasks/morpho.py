@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-def __minmax_method(  # type: ignore
+def _minmax_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
     coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
     iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
@@ -28,7 +28,7 @@ def __minmax_method(  # type: ignore
     ...
 
 
-def __morpho_method(  # type: ignore
+def _morpho_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
     coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
@@ -36,7 +36,7 @@ def __morpho_method(  # type: ignore
     ...
 
 
-def __morpho_method2(  # type: ignore
+def _morpho_method2(  # type: ignore
     self: Morpho, clip: vs.VideoNode, sw: int, sh: int | None = None, mode: XxpandMode = XxpandMode.RECTANGLE,
     thr: int | None = None, planes: PlanesT = None, *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -211,7 +211,7 @@ class Morpho:
         return norm_expr(src, expr, planes)
 
     @inject_self
-    @copy_signature(__minmax_method)
+    @copy_signature(_minmax_method)
     def maximum(
         self, src: vs.VideoNode, thr: int | float | None = None,
         coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
@@ -221,7 +221,7 @@ class Morpho:
         return self.dilation(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
 
     @inject_self
-    @copy_signature(__minmax_method)
+    @copy_signature(_minmax_method)
     def minimum(
         self, src: vs.VideoNode, thr: int | float | None = None,
         coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
@@ -249,27 +249,27 @@ class Morpho:
         return src
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def dilation(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         return self._mm_func(*args, func=func or self.dilation, mm_func=core.std.Maximum, op=ExprOp.MAX, **kwargs)
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def erosion(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         return self._mm_func(*args, func=func or self.erosion, mm_func=core.std.Minimum, op=ExprOp.MIN, **kwargs)
 
     @inject_self
-    @copy_signature(__morpho_method2)
+    @copy_signature(_morpho_method2)
     def expand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         return self.xxpand_transform(clip, ExprOp.MIN, *args, func=func, **kwargs)
 
     @inject_self
-    @copy_signature(__morpho_method2)
+    @copy_signature(_morpho_method2)
     def inpand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         return self.xxpand_transform(clip, ExprOp.MAX, *args, func=func, **kwargs)
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def closing(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         func = func or self.closing
 
@@ -279,7 +279,7 @@ class Morpho:
         return eroded
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def opening(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         func = func or self.closing
 
@@ -309,14 +309,14 @@ class Morpho:
         return norm_expr([dilated, eroded], 'x y -', planes)
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def top_hat(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         opened = self.opening(src, *args, func=func or self.top_hat, **kwargs)
 
         return norm_expr([src, opened], 'x y -', kwargs.get('planes', args[1] if len(args) > 1 else None))
 
     @inject_self
-    @copy_signature(__morpho_method)
+    @copy_signature(_morpho_method)
     def black_hat(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
         closed = self.closing(src, *args, func=func or self.black_hat, **kwargs)
 
