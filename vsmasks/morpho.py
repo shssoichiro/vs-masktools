@@ -11,7 +11,7 @@ from vstools import (
     inject_self, interleave_arr, iterate, vs
 )
 
-from .types import MorphoFunc, XxpandMode
+from .types import Coordinates, MorphoFunc, XxpandMode
 
 __all__ = [
     'Morpho',
@@ -170,16 +170,13 @@ class Morpho:
 
         function = self.maximum if op is ExprOp.MAX else self.minimum
 
-        for (wi, hi) in zip_longest(range(sw, -1, -1), range(sh, -1, -1), fillvalue=0):
+        for wi, hi in zip_longest(range(sw, -1, -1), range(sh, -1, -1), fillvalue=0):
             if wi > 0 and hi > 0:
-                if mode == XxpandMode.LOSANGE or (mode == XxpandMode.ELLIPSE and wi % 3 != 1):
-                    coordinates = [0, 1, 0, 1, 1, 0, 1, 0]
-                else:
-                    coordinates = [1] * 8
+                coordinates = Coordinates.from_xxpand_mode(mode, wi)
             elif wi > 0:
-                coordinates = [0, 0, 0, 1, 1, 0, 0, 0]
+                coordinates = Coordinates.HORIZONTAL
             elif hi > 0:
-                coordinates = [0, 1, 0, 0, 0, 0, 1, 0]
+                coordinates = Coordinates.VERTICAL
             else:
                 break
 
