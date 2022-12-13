@@ -21,7 +21,7 @@ __all__ = [
 
 def _minmax_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
-    coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
+    coords: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
     iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -30,7 +30,7 @@ def _minmax_method(  # type: ignore
 
 def _morpho_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
-    coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
+    coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     ...
@@ -53,40 +53,40 @@ class Morpho:
         self._fast = fallback(self.fast, aka_expr_available) and aka_expr_available
 
     def _check_params(
-        self, radius: int, thr: int | float | None, coordinates: int | tuple[int, ConvMode] | Sequence[int],
+        self, radius: int, thr: int | float | None, coords: int | tuple[int, ConvMode] | Sequence[int],
         planes: PlanesT, func: FuncExceptT
     ) -> tuple[FuncExceptT, PlanesT]:
         if radius < 1:
             raise CustomIndexError('radius has to be greater than 0!', func, radius)
 
-        if isinstance(coordinates, (int, tuple)):
-            size = coordinates if isinstance(coordinates, int) else coordinates[0]
+        if isinstance(coords, (int, tuple)):
+            size = coords if isinstance(coords, int) else coords[0]
 
             if size < 2:
-                raise CustomIndexError('when int or tuple, coordinates has to be greater than 1!', func, coordinates)
+                raise CustomIndexError('when int or tuple, coords has to be greater than 1!', func, coords)
 
             if not self._fast and size != 3:
                 raise CustomIndexError(
-                    'with fast=False or no akarin plugin, you must have coordinates=3!', func, coordinates
+                    'with fast=False or no akarin plugin, you must have coords=3!', func, coords
                 )
-        elif len(coordinates) != 8:
-            raise CustomIndexError('when a list, coordinates must contain exactly 8 numbers!', func, coordinates)
+        elif len(coords) != 8:
+            raise CustomIndexError('when a list, coords must contain exactly 8 numbers!', func, coords)
 
         if thr is not None and thr < 0.0:
-            raise CustomIndexError('thr must be a positive number!', func, coordinates)
+            raise CustomIndexError('thr must be a positive number!', func, coords)
 
         return self.func or func, self.planes if planes is None else planes
 
     @classmethod
     def _morpho_xx_imum(
         cls, thr: int | float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
-        coordinates: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None
+        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None
     ) -> StrList:
-        if isinstance(coordinates, (int, tuple)):
-            if isinstance(coordinates, tuple):
-                size, mode = coordinates
+        if isinstance(coords, (int, tuple)):
+            if isinstance(coords, tuple):
+                size, mode = coords
             else:
-                size, mode = coordinates, ConvMode.SQUARE
+                size, mode = coords, ConvMode.SQUARE
 
             assert size > 1
 
@@ -98,14 +98,14 @@ class Morpho:
                 exclude.extend((x, radius) for x in range(-radius, radius + 1))
                 exclude.append((radius, radius - 1))
         else:
-            coordinates = list(coordinates)
+            coords = list(coords)
             radius, mode = 3, ConvMode.SQUARE
 
         matrix = ExprOp.matrix('x', radius, mode, exclude)
 
-        if not isinstance(coordinates, (int, tuple)):
+        if not isinstance(coords, (int, tuple)):
             matrix.insert(len(matrix) // 2, 1)
-            matrix = StrList([x for x, coord in zip(matrix, coordinates) if coord])
+            matrix = StrList([x for x, coord in zip(matrix, coords) if coord])
 
         matrix = StrList(interleave_arr(matrix, op * matrix.mlength, 2))
 
@@ -119,30 +119,30 @@ class Morpho:
 
     def _mm_func(
         self, src: vs.VideoNode, radius: int, planes: PlanesT, thr: int | float | None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None,
+        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None,
         *, func: FuncExceptT, mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX],
         **kwargs: Any
     ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coordinates, planes, func)
+        func, planes = self._check_params(radius, thr, coords, planes, func)
 
         if self._fast:
             mm_func = norm_expr  # type: ignore[assignment]
-            kwargs.update(expr=self._morpho_xx_imum(thr, op, coordinates, multiply))
-        elif isinstance(coordinates, (int, tuple)):
-            if isinstance(coordinates, tuple):
-                if coordinates[1] is not ConvMode.SQUARE:
+            kwargs.update(expr=self._morpho_xx_imum(thr, op, coords, multiply))
+        elif isinstance(coords, (int, tuple)):
+            if isinstance(coords, tuple):
+                if coords[1] is not ConvMode.SQUARE:
                     raise CustomIndexError(
-                        'with fast=False or no akarin plugin, you must have ConvMode.SQUARE!', func, coordinates
+                        'with fast=False or no akarin plugin, you must have ConvMode.SQUARE!', func, coords
                     )
 
-                coordinates = coordinates[0]
+                coords = coords[0]
 
-            if coordinates != 3:
+            if coords != 3:
                 raise CustomIndexError(
-                    'with fast=False or no akarin plugin, you must have coordinates=3!', func, coordinates
+                    'with fast=False or no akarin plugin, you must have coords=3!', func, coords
                 )
 
-            kwargs.update(coordinates=[1] * 8)
+            kwargs.update(coords=[1] * 8)
 
         if not self._fast and multiply is not None:
             orig_mm_func = mm_func
@@ -172,15 +172,15 @@ class Morpho:
 
         for wi, hi in zip_longest(range(sw, -1, -1), range(sh, -1, -1), fillvalue=0):
             if wi > 0 and hi > 0:
-                coordinates = Coordinates.from_xxpand_mode(mode, wi)
+                coords = Coordinates.from_xxpand_mode(mode, wi)
             elif wi > 0:
-                coordinates = Coordinates.HORIZONTAL
+                coords = Coordinates.HORIZONTAL
             elif hi > 0:
-                coordinates = Coordinates.VERTICAL
+                coords = Coordinates.VERTICAL
             else:
                 break
 
-            clip = function(clip, thr, coordinates, planes=planes, func=func)
+            clip = function(clip, thr, coords, planes=planes, func=func)
 
         return clip
 
@@ -214,21 +214,21 @@ class Morpho:
     @copy_signature(_minmax_method)
     def maximum(
         self, src: vs.VideoNode, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
-        return self.dilation(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
+        return self.dilation(src, iterations, planes, thr, coords or ([1] * 8), multiply, func=func, **kwargs)
 
     @inject_self
     @copy_signature(_minmax_method)
     def minimum(
         self, src: vs.VideoNode, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
-        return self.erosion(src, iterations, planes, thr, coordinates or ([1] * 8), multiply, func=func, **kwargs)
+        return self.erosion(src, iterations, planes, thr, coords or ([1] * 8), multiply, func=func, **kwargs)
 
     @inject_self
     def inflate(
@@ -291,20 +291,20 @@ class Morpho:
     @inject_self
     def gradient(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coordinates, planes, func or self.gradient)
+        func, planes = self._check_params(radius, thr, coords, planes, func or self.gradient)
 
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{dilated} {eroded} -', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coordinates),
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coordinates)
+                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords),
+                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords)
             )
 
-        eroded = self.erosion(src, radius, planes, thr, coordinates, multiply, func=func, **kwargs)
-        dilated = self.dilation(src, radius, planes, thr, coordinates, multiply, func=func, **kwargs)
+        eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
+        dilated = self.dilation(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
 
         return norm_expr([dilated, eroded], 'x y -', planes)
 
@@ -325,43 +325,43 @@ class Morpho:
     @inject_self
     def outer_hat(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coordinates, planes, func or self.outer_hat)
+        func, planes = self._check_params(radius, thr, coords, planes, func or self.outer_hat)
 
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{dilated} x -', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coordinates)
+                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords)
             )
 
-        dilated = self.dilation(src, radius, planes, thr, coordinates, multiply, func=func, **kwargs)
+        dilated = self.dilation(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
 
         return norm_expr([dilated, src], 'x y -', planes)
 
     @inject_self
     def inner_hat(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
-        coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coordinates, planes, func or self.inner_hat)
+        func, planes = self._check_params(radius, thr, coords, planes, func or self.inner_hat)
 
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{eroded} x -', planes,
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coordinates)
+                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords)
             )
 
-        eroded = self.erosion(src, radius, planes, thr, coordinates, multiply, func=func, **kwargs)
+        eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
 
         return norm_expr([eroded, src], 'x y -', planes)
 
 
 def grow_mask(
     mask: vs.VideoNode, radius: int = 1, multiply: float = 1.0,
-    planes: PlanesT = None, coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5,
+    planes: PlanesT = None, coords: int | tuple[int, ConvMode] | Sequence[int] = 5,
     thr: int | float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     func = func or grow_mask
@@ -370,7 +370,7 @@ def grow_mask(
 
     morpho = Morpho(planes)
 
-    kwargs.update(thr=thr, coordinates=coordinates, func=func)
+    kwargs.update(thr=thr, coords=coords, func=func)
 
     closed = morpho.closing(mask, **kwargs)
     dilated = morpho.dilation(closed, **kwargs)
