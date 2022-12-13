@@ -28,14 +28,6 @@ def __minmax_method(  # type: ignore
     ...
 
 
-def __xxflate_method(  # type: ignore
-    self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
-    iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-    *, func: FuncExceptT | None = None, **kwargs: Any
-) -> vs.VideoNode:
-    ...
-
-
 def __morpho_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
     coordinates: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
@@ -242,14 +234,22 @@ class Morpho:
         return norm_expr(src, expr, planes)
 
     @inject_self
-    @copy_signature(__xxflate_method)
-    def inflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self._xxflate(True, *args, func=func or self.inflate, **kwargs)
+    def inflate(
+        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
+    ) -> vs.VideoNode:
+        for _ in range(iterations):
+            src = self._xxflate(True, src, radius, planes, thr, multiply, func=func or self.inflate)
+        return src
 
     @inject_self
-    @copy_signature(__xxflate_method)
-    def deflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self._xxflate(False, *args, func=func or self.deflate, **kwargs)
+    def deflate(
+        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
+    ) -> vs.VideoNode:
+        for _ in range(iterations):
+            src = self._xxflate(False, src, radius, planes, thr, multiply, func=func or self.deflate)
+        return src
 
     @inject_self
     @copy_signature(__morpho_method)
