@@ -37,6 +37,7 @@ class Coordinates(list[int], CustomEnum):
     HORIZONTAL = [0, 0, 0, 1, 1, 0, 0, 0]
     RECTANGLE = [1, 1, 1, 1, 1, 1, 1, 1]
     DIAMOND = [0, 1, 0, 1, 1, 0, 1, 0]
+    CORNERS = [1, 0, 1, 0, 0, 1, 0, 1]
 
     @classmethod
     def from_iter(cls, iter: int) -> Coordinates:
