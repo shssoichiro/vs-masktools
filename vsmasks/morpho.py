@@ -110,10 +110,10 @@ class Morpho:
         matrix = StrList(interleave_arr(matrix, op * matrix.mlength, 2))
 
         if thr is not None:
-            matrix.extend(['x', thr, ExprOp.SUB, ExprOp.MAX])
+            matrix.append('x', thr, ExprOp.SUB, ExprOp.MAX)
 
         if multiply is not None:
-            matrix.extend([multiply, ExprOp.MUL])
+            matrix.append(multiply, ExprOp.MUL)
 
         return matrix
 
