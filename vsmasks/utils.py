@@ -1,20 +1,24 @@
 from __future__ import annotations
+
 from typing import Iterable
 
 from vsexprtools import ExprOp, aka_expr_available, norm_expr
 from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
-from vstools import (CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable,
-                     check_variable_format, flatten, get_peak_value, insert_clip, replace_ranges, split, vs)
+from vstools import (
+    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable, check_variable_format, flatten,
+    get_peak_value, insert_clip, replace_ranges, split, vs
+)
 
 __all__ = [
     'max_planes',
+
+    'region_rel_mask', 'region_abs_mask',
 
     'squaremask',
     'replace_squaremask',
     'freeze_replace_squaremask',
 ]
-
 
 
 def max_planes(*_clips: vs.VideoNode | Iterable[vs.VideoNode], resizer: KernelT = Bilinear) -> vs.VideoNode:
@@ -29,6 +33,46 @@ def max_planes(*_clips: vs.VideoNode | Iterable[vs.VideoNode], resizer: KernelT 
     return ExprOp.MAX.combine(
         split(resizer.scale(clip, width, height, format=fmt)) for clip in clips
     )
+
+
+def _get_region_expr(
+    clip: vs.VideoNode | vs.VideoFrame, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0,
+    replace: str | int = 0, rel: bool = False
+) -> str:
+    right, bottom = right + 1, bottom + 1
+
+    if isinstance(replace, int):
+        replace = f'x {replace}'
+
+    if rel:
+        return f'X {left} < X {right} > or Y {top} < Y {bottom} > or or {replace} ?'
+
+    return f'X {left} < X {clip.width - right} > or Y {top} < Y {clip.height - bottom} > or or {replace} ?'
+
+
+def region_rel_mask(clip: vs.VideoNode, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0) -> vs.VideoNode:
+    if aka_expr_available:
+        return norm_expr(clip, _get_region_expr(clip, left, right, top, bottom, 0), force_akarin=region_rel_mask)
+
+    return clip.std.Crop(left, right, top, bottom).std.AddBorders(left, right, top, bottom)
+
+
+def region_abs_mask(clip: vs.VideoNode, width: int, height: int, left: int = 0, top: int = 0) -> vs.VideoNode:
+    def _crop(w: int, h: int) -> vs.VideoNode:
+        return clip.std.CropAbs(width, height, left, top).std.AddBorders(
+            left, w - width - left, top, h - height - top
+        )
+
+    if 0 in {clip.width, clip.height}:
+        if aka_expr_available:
+            return norm_expr(
+                clip, _get_region_expr(clip, left, left + width, top, top + height, 0, True),
+                force_akarin=region_rel_mask
+            )
+
+        return clip.std.FrameEval(lambda f, n: _crop(f.width, f.height), clip)
+
+    return region_rel_mask(clip, left, clip.width - width - left, top, clip.height - height - top)
 
 
 def squaremask(
@@ -47,14 +91,11 @@ def squaremask(
     if aka_expr_available:
         base_clip = clip.std.BlankClip(mask_format.id, 1, color=0, keep=True)
 
-        invert_str = 'range_max x' if invert else 'x range_max'
-
-        right = clip.width - (offset_x + 1)
-        bottom = clip.height - (offset_y + 1)
-
         mask = norm_expr(
-            base_clip, f'X {offset_x} < X {right} > or Y {offset_y} < Y {bottom} > or or {invert_str} ?',
-            force_akarin=func
+            base_clip, _get_region_expr(
+                clip, offset_y, clip.width - width - offset_x, offset_x, clip.height - height - offset_y,
+                'range_max x' if invert else 'x range_max'
+            ), force_akarin=func
         )
     else:
         base_clip = clip.std.BlankClip(
