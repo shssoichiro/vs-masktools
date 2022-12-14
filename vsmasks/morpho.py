@@ -82,6 +82,8 @@ class Morpho:
         cls, thr: int | float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
         coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None
     ) -> StrList:
+        exclude = list[tuple[int, int]]()
+
         if isinstance(coords, (int, tuple)):
             if isinstance(coords, tuple):
                 size, mode = coords
@@ -91,8 +93,6 @@ class Morpho:
             assert size > 1
 
             radius = size // 2
-
-            exclude = list[tuple[int, int]]()
 
             if size % 2 == 0:
                 exclude.extend((x, radius) for x in range(-radius, radius + 1))
@@ -194,6 +194,8 @@ class Morpho:
 
         conv_len = len(expr)
 
+        expr.append(ExprOp.ADD * expr.mlength)
+
         if src.format.sample_type is vs.INTEGER:
             expr.append(radius * 4, ExprOp.ADD)
 
@@ -203,7 +205,7 @@ class Morpho:
         if thr is not None:
             limit = ['x', thr, ExprOp.ADD] if inflate else ['x', thr, ExprOp.SUB, ExprToken.RangeMin, ExprOp.MAX]
 
-        expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
+            expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
 
         if multiply is not None:
             expr.append(multiply, ExprOp.MUL)
