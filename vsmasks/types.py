@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from vstools import PlanesT, SingleOrArrOpt, vs, CustomEnum
+from vstools import CustomEnum, PlanesT, SingleOrArrOpt, vs
 
 __all__ = [
     'MorphoFunc',

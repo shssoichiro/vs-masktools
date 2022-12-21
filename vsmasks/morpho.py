@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from typing import Any, Literal, Sequence
 
-from vsexprtools import ExprOp, ExprToken, aka_expr_available, norm_expr
+from vsexprtools import ExprList, ExprOp, ExprToken, aka_expr_available, norm_expr
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
@@ -105,9 +105,9 @@ class Morpho:
 
         if not isinstance(coords, (int, tuple)):
             matrix.insert(len(matrix) // 2, 1)
-            matrix = StrList([x for x, coord in zip(matrix, coords) if coord])
+            matrix = ExprList([x for x, coord in zip(matrix, coords) if coord])
 
-        matrix = StrList(interleave_arr(matrix, op * matrix.mlength, 2))
+        matrix = ExprList(interleave_arr(matrix, op * matrix.mlength, 2))
 
         if thr is not None:
             matrix.append('x', thr, ExprOp.SUB, ExprOp.MAX)

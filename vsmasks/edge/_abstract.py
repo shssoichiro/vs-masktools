@@ -4,16 +4,19 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import ClassVar, NoReturn, Sequence, TypeAlias, cast
 
-from vstools import StrList, core, vs, check_variable
-from vsexprtools import ExprOp, ExprVars
+from vsexprtools import ExprOp
+from vstools import check_variable, core, vs
 
 __all__ = [
     'EdgeDetect', 'EdgeDetectT',
-    'MatrixEdgeDetect',
-    'SingleMatrix',
-    'EuclidianDistance',
+    'RidgeDetect', 'RidgeDetectT',
+
+    'MatrixEdgeDetect', 'SingleMatrix', 'EuclidianDistance',
+
     'Max',
-    'RidgeDetect'
+
+    'get_all_edge_detects',
+    'get_all_ridge_detect',
 ]
 
 
@@ -24,6 +27,7 @@ class _Feature(Enum):
 
 class EdgeDetect(ABC):
     """Abstract edge detection interface."""
+
     _bits: int
 
     def edgemask(
@@ -253,4 +257,73 @@ class Max(MatrixEdgeDetect, ABC):
         raise NotImplementedError
 
 
-EdgeDetectT: TypeAlias = type[EdgeDetect] | EdgeDetect | str
+EdgeDetectT: TypeAlias = type[EdgeDetect] | EdgeDetect | str  # type: ignore
+RidgeDetectT: TypeAlias = type[RidgeDetect] | RidgeDetect | str  # type: ignore
+
+
+def get_all_edge_detects(
+    clip: vs.VideoNode,
+    lthr: float = 0.0, hthr: float | None = None,
+    multi: float = 1.0,
+    clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
+) -> list[vs.VideoNode]:
+    """
+    Returns all the EdgeDetect subclasses
+
+    :param clip:        Source clip
+    :param lthr:        See :py:func:`EdgeDetect.get_mask`
+    :param hthr:        See :py:func:`EdgeDetect.get_mask`
+    :param multi:       See :py:func:`EdgeDetect.get_mask`
+    :param clamp:       Clamp to TV or full range if True or specified range `(low, high)`
+
+    :return:            A list edge masks
+    """
+    def _all_subclasses(cls: type[EdgeDetect] = EdgeDetect) -> set[type[EdgeDetect]]:
+        return set(cls.__subclasses__()).union(s for c in cls.__subclasses__() for s in _all_subclasses(c))
+
+    all_subclasses = {
+        s for s in _all_subclasses()
+        if s.__name__ not in {
+            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclidianDistance', 'Max',
+            'Matrix1D', 'SavitzkyGolay', 'SavitzkyGolayNormalise',
+            'Matrix2x2', 'Matrix3x3', 'Matrix5x5'
+        }
+    }
+    return [
+        edge_detect().edgemask(clip, lthr, hthr, multi, clamp).text.Text(edge_detect.__name__)
+        for edge_detect in sorted(all_subclasses, key=lambda x: x.__name__)
+    ]
+
+
+def get_all_ridge_detect(
+    clip: vs.VideoNode,
+    lthr: float = 0.0, hthr: float | None = None,
+    multi: float = 1.0,
+    clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
+) -> list[vs.VideoNode]:
+    """
+    Returns all the RidgeDetect subclasses
+
+    :param clip:        Source clip
+    :param lthr:        See :py:func:`EdgeDetect.get_mask`
+    :param hthr:        See :py:func:`EdgeDetect.get_mask`
+    :param multi:       See :py:func:`EdgeDetect.get_mask`
+    :param clamp:       Clamp to TV or full range if True or specified range `(low, high)`
+
+    :return:            A list edge masks
+    """
+    def _all_subclasses(cls: type[RidgeDetect] = RidgeDetect) -> set[type[RidgeDetect]]:
+        return set(cls.__subclasses__()).union(s for c in cls.__subclasses__() for s in _all_subclasses(c))
+
+    all_subclasses = {
+        s for s in _all_subclasses()
+        if s.__name__ not in {
+            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclidianDistance', 'Max',
+            'Matrix1D', 'SavitzkyGolay', 'SavitzkyGolayNormalise',
+            'Matrix2x2', 'Matrix3x3', 'Matrix5x5'
+        }
+    }
+    return [
+        edge_detect().ridgemask(clip, lthr, hthr, multi, clamp).text.Text(edge_detect.__name__)
+        for edge_detect in sorted(all_subclasses, key=lambda x: x.__name__)
+    ]

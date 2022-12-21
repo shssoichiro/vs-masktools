@@ -6,7 +6,6 @@ from vstools import check_variable, join, normalize_seq, split, vs
 from .morpho import Morpho
 from .types import Coordinates
 
-
 __all__ = [
     'range_mask'
 ]

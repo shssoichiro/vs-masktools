@@ -15,6 +15,14 @@ from .morpho import Morpho
 from .types import XxpandMode
 
 
+__all__ = [
+    'diff_rescale',
+    'diff_creditless',
+    'diff_creditless_oped',
+    'credit_mask',
+]
+
+
 def diff_rescale(
     clip: vs.VideoNode, height: int, kernel: KernelT = Catrom,
     thr: int | float = 55, expand: int = 2, func: FuncExceptT | None = None

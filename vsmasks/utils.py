@@ -15,9 +15,7 @@ __all__ = [
 
     'region_rel_mask', 'region_abs_mask',
 
-    'squaremask',
-    'replace_squaremask',
-    'freeze_replace_squaremask',
+    'squaremask', 'replace_squaremask', 'freeze_replace_squaremask',
 ]
 
 

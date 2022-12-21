@@ -8,8 +8,8 @@ from typing import NoReturn, Sequence
 
 from vstools import ColorRange, depth, get_depth, join, split, vs
 
-from ..types import XxpandMode
 from ..morpho import Morpho
+from ..types import XxpandMode
 from ._abstract import EdgeDetect, EuclidianDistance, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
 
 __all__ = [
@@ -40,26 +40,31 @@ class Matrix3x3(EdgeDetect, ABC):
 # Single matrix
 class Laplacian1(SingleMatrix, Matrix3x3):
     """Pierre-Simon de Laplace operator 1st implementation."""
+
     matrices = [[0, -1, 0, -1, 4, -1, 0, -1, 0]]
 
 
 class Laplacian2(SingleMatrix, Matrix3x3):
     """Pierre-Simon de Laplace operator 2nd implementation."""
+
     matrices = [[1, -2, 1, -2, 4, -2, 1, -2, 1]]
 
 
 class Laplacian3(SingleMatrix, Matrix3x3):
     """Pierre-Simon de Laplace operator 3rd implementation."""
+
     matrices = [[2, -1, 2, -1, -4, -1, 2, -1, 2]]
 
 
 class Laplacian4(SingleMatrix, Matrix3x3):
     """Pierre-Simon de Laplace operator 4th implementation."""
+
     matrices = [[-1, -1, -1, -1, 8, -1, -1, -1, -1]]
 
 
 class Kayyali(SingleMatrix, Matrix3x3):
     """Kayyali operator."""
+
     matrices = [[6, 0, -6, 0, 0, 0, -6, 0, 6]]
 
 
@@ -69,6 +74,7 @@ class Tritical(RidgeDetect, EuclidianDistance, Matrix3x3):
     Operator used in Tritical's original TCanny filter.
     Plain and simple orthogonal first order derivative.
     """
+
     matrices = [
         [0, 0, 0, -1, 0, 1, 0, 0, 0],
         [0, 1, 0, 0, 0, 0, 0, -1, 0]
@@ -93,6 +99,7 @@ class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
     "HotDoG" Operator from AVS ExTools by Dogway.
     Plain and simple cross first order derivative.
     """
+
     matrices = [
         [1, 0, 0, 0, 0, 0, 0, 0, -1],
         [0, 0, -1, 0, 0, 0, 1, 0, 0]
@@ -101,6 +108,7 @@ class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
 
 class Prewitt(RidgeDetect, EuclidianDistance, Matrix3x3):
     """Judith M. S. Prewitt operator."""
+
     matrices = [
         [1, 0, -1, 1, 0, -1, 1, 0, -1],
         [1, 1, 1, 0, 0, 0, -1, -1, -1]
@@ -129,6 +137,7 @@ class PrewittTCanny(Matrix3x3, EdgeDetect):
 
 class Sobel(RidgeDetect, EuclidianDistance, Matrix3x3):
     """Sobel–Feldman operator."""
+
     matrices = [
         [1, 0, -1, 2, 0, -2, 1, 0, -1],
         [1, 2, 1, 0, 0, 0, -1, -2, -1]
@@ -159,14 +168,6 @@ class ASobel(Matrix3x3, EdgeDetect):
     """Modified Sobel–Feldman operator from AWarpSharp."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        # warp.ASobel and warpsf.ASobel have different function signatures
-        # so mypy set the ternary expression as Callable[..., Any]
-        # which makes sense.
-        # Since we're using ``warn_return_any = True`` in mypy config,
-        # mypy warns us about not being able to call a function of unknown type
-        # and returning Any from ``_compute_edge_mask`` declared to return "VideoNode".
-        # I could edit the stubs files but then, they will be wrong and adding more boilerplate code
-        # for just satisfy mypy here doesn't seem to be very relevant.
         return (vs.core.warp.ASobel if get_depth(clip) < 32 else vs.core.warpsf.ASobel)(clip, 255)  # type: ignore
 
     def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
@@ -178,6 +179,7 @@ class Scharr(RidgeDetect, EuclidianDistance, Matrix3x3):
     Original H. Scharr optimised operator which attempts
     to achieve the perfect rotational symmetry with coefficients 3 and 10.
     """
+
     matrices = [
         [-3, 0, 3, -10, 0, 10, -3, 0, 3],
         [-3, -10, -3, 0, 0, 0, 3, 10, 3]
@@ -190,6 +192,7 @@ class RScharr(RidgeDetect, EuclidianDistance, Matrix3x3):
     Refined H. Scharr operator to more accurately calculate
     1st derivatives for a 3x3 kernel with coeffs 47 and 162.
     """
+
     matrices = [
         [-47, 0, 47, -162, 0, 162, -47, 0, 47],
         [-47, -162, -47, 0, 0, 0, 47, 162, 47]
@@ -209,6 +212,7 @@ class ScharrTCanny(Matrix3x3, EdgeDetect):
 
 class Kroon(RidgeDetect, EuclidianDistance, Matrix3x3):
     """Dirk-Jan Kroon operator."""
+
     matrices = [
         [-17, 0, 17, -61, 0, 61, -17, 0, 17],
         [-17, -61, -17, 0, 0, 0, 17, 61, 17]
@@ -228,6 +232,7 @@ class KroonTCanny(Matrix3x3, EdgeDetect):
 
 class FreyChen(MatrixEdgeDetect):
     """Chen Frei operator. 3x3 matrices properly implemented."""
+
     sqrt2 = math.sqrt(2)
     matrices = [
         [1, sqrt2, 1, 0, 0, 0, -1, -sqrt2, -1],
@@ -269,6 +274,7 @@ class FreyChen(MatrixEdgeDetect):
 
 class FreyChenG41(RidgeDetect, EuclidianDistance, Matrix3x3):
     """"Chen Frei" operator. 3x3 matrices from G41Fun."""
+
     matrices = [
         [-7, 0, 7, -10, 0, 10, -7, 0, 7],
         [-7, -10, -7, 0, 0, 0, 7, 10, 7]
@@ -279,6 +285,7 @@ class FreyChenG41(RidgeDetect, EuclidianDistance, Matrix3x3):
 # Max
 class Robinson3(Max, Matrix3x3):
     """Robinson compass operator level 3."""
+
     matrices = [
         [1, 1, 1, 0, 0, 0, -1, -1, -1],
         [1, 1, 0, 1, 0, -1, 0, -1, -1],
@@ -289,6 +296,7 @@ class Robinson3(Max, Matrix3x3):
 
 class Robinson5(Max, Matrix3x3):
     """Robinson compass operator level 5."""
+
     matrices = [
         [1, 2, 1, 0, 0, 0, -1, -2, -1],
         [2, 1, 0, 1, 0, -1, 0, -1, -2],
@@ -299,6 +307,7 @@ class Robinson5(Max, Matrix3x3):
 
 class TheToof(Max, Matrix3x3):
     """TheToof compass operator from SharpAAMCmod."""
+
     matrices = [
         [5, 10, 5, 0, 0, 0, -5, -10, -5],
         [10, 5, 0, 5, 0, -5, 0, -5, -10],
@@ -310,6 +319,7 @@ class TheToof(Max, Matrix3x3):
 
 class Kirsch(Max, Matrix3x3):
     """Russell Kirsch compass operator."""
+
     matrices = [
         [5, 5, 5, -3, 0, -3, -3, -3, -3],
         [5, 5, -3, 5, 0, -3, -3, -3, -3],
@@ -335,6 +345,7 @@ class KirschTCanny(Matrix3x3, EdgeDetect):
 # Misc
 class MinMax(EdgeDetect):
     """Min/max mask with separate luma/chroma radii."""
+
     radii: tuple[int, int, int]
 
     def __init__(self, rady: int = 2, radc: int = 0) -> None:
