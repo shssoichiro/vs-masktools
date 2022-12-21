@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import math
 from abc import ABC
+from dataclasses import dataclass
 from typing import NoReturn, Sequence
 
+from vsexprtools import ExprOp
 from vstools import ColorRange, depth, get_depth, join, split, vs
 
 from ..morpho import Morpho
@@ -343,29 +345,24 @@ class KirschTCanny(Matrix3x3, EdgeDetect):
 
 
 # Misc
+@dataclass
 class MinMax(EdgeDetect):
     """Min/max mask with separate luma/chroma radii."""
 
-    radii: tuple[int, int, int]
-
-    def __init__(self, rady: int = 2, radc: int = 0) -> None:
-        """
-        :param rady:    Luma radius
-        :param radc:    Chroma radius
-        """
-        super().__init__()
-        self.radii = (rady, radc, radc)
+    rady: int = 2
+    radc: int = 0
 
     def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
         assert clip.format
-        planes = [
-            vs.core.std.Expr([
+
+        return join([
+            ExprOp.SUB.combine(
                 Morpho.expand(p, rad, rad, XxpandMode.ELLIPSE),
-                Morpho.inpand(p, rad, rad, XxpandMode.ELLIPSE)],
-                'x y -'
-            ) for p, rad in zip(split(clip), self.radii)
-        ]
-        return join(planes, clip.format.color_family)
+                Morpho.inpand(p, rad, rad, XxpandMode.ELLIPSE)
+            ) if rad > 0 else p for p, rad in zip(
+                split(clip), (self.rady, self.radc, self.radc)[:clip.format.num_planes]
+            )
+        ], clip.format.color_family)
 
     def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
         raise NotImplementedError
