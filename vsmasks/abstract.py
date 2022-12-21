@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 from vsexprtools import ExprOp, norm_expr
 from vsrgtools import box_blur
@@ -17,7 +18,9 @@ __all__ = [
 
 
 class Mask(ABC):
-    ...
+    @abstractmethod
+    def get_mask(self, clip: vs.VideoNode, *args: Any) -> vs.VideoNode:
+        ...
 
 
 class BoundingBox(Mask):
@@ -28,7 +31,7 @@ class BoundingBox(Mask):
     def __init__(self, pos: tuple[int, int] | Position, size: tuple[int, int] | Size, invert: bool = False) -> None:
         self.pos, self.size, self.invert = Position(pos), Size(size), invert
 
-    def get_mask(self, ref: vs.VideoNode) -> vs.VideoNode:
+    def get_mask(self, ref: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
         return squaremask(ref, self.size.x, self.size.y, self.pos.x, self.pos.y, self.invert, self.get_mask)
 
 
@@ -56,7 +59,7 @@ class DeferredMask(Mask):
                 self.__class__, '', 'Received reference frame and range list size mismatch!'
             )
 
-    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
+    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
         assert check_variable(clip, self.get_mask)
         assert check_variable(ref, self.get_mask)
 
