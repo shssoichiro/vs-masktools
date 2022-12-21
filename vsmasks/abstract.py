@@ -71,7 +71,7 @@ class DeferredMask(Mask):
 
         if len(self.refframes) == 0:
             hm = ref.std.BlankClip(
-                format=ref.format.replace(color_family=vs.GRAY, subsampling_h=0, subsampling_w=0).id
+                format=ref.format.replace(color_family=vs.GRAY, subsampling_h=0, subsampling_w=0).id, keep=True
             )
 
             for ran, rf in zip(self.ranges, self.refframes):
