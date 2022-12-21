@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Sequence
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
+from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
 from vstools import check_variable, core, depth, get_depth, get_peak_value, get_y, iterate, plane, scale_thresh, vs
 
-from vsmasks.morpho import Morpho
-
-from .edge import EdgeDetect, FDoGTCanny, Prewitt
+from .details import multi_detail_mask
+from .edge import EdgeDetect, FDoGTCanny, Kirsch, Prewitt
+from .funcs import retinex
+from .morpho import Morpho
+from .types import Coordinates
 
 __all__ = [
     'ringing_mask',
 
-    'luma_mask', 'luma_credit_mask'
+    'luma_mask', 'luma_credit_mask',
+
+    'tcanny_retinex',
 ]
 
 
@@ -78,3 +84,15 @@ def luma_credit_mask(
         credit_mask = iterate(credit_mask, core.std.Inflate, 2)
 
     return credit_mask
+
+
+def tcanny_retinex(
+    clip: vs.VideoNode, thr: float, sigma: Sequence[float] = [50, 200, 350], blur_sigma: float = 1.0
+) -> vs.VideoNode:
+    blur = gauss_blur(clip, blur_sigma)
+
+    msrcp = retinex(blur, sigma, upper_thr=thr, fast=True, func=tcanny_retinex)
+
+    tcunnied = msrcp.tcanny.TCanny(mode=1, sigma=1)
+
+    return Morpho.minimum(tcunnied, None, Coordinates.CORNERS)
