@@ -20,6 +20,8 @@ __all__ = [
     'luma_mask', 'luma_credit_mask',
 
     'tcanny_retinex',
+
+    'limited_linemask'
 ]
 
 
@@ -96,3 +98,16 @@ def tcanny_retinex(
     tcunnied = msrcp.tcanny.TCanny(mode=1, sigma=1)
 
     return Morpho.minimum(tcunnied, None, Coordinates.CORNERS)
+
+
+def limited_linemask(
+    clip_y: vs.VideoNode,
+    sigmas: list[float] = [0.000125, 0.0025, 0.0055],
+    detail_sigmas: list[float] = [0.011, 0.013],
+    edgemasks: Sequence[EdgeDetect] = [Kirsch()]
+) -> vs.VideoNode:
+    return ExprOp.ADD.combine(
+        (edge.edgemask(clip_y) for edge in edgemasks),
+        (tcanny_retinex(clip_y, s) for s in sigmas),
+        (multi_detail_mask(clip_y, s) for s in detail_sigmas)
+    )
