@@ -43,8 +43,8 @@ def diff_rescale(
 
 
 def diff_creditless(
-    src_clip: vs.VideoNode, credit_clip: vs.VideoNode, nc_clip: vs.VideoNode,
-    start_frame: int, thr: int, expand: int = 2, *, prefilter: bool | int = False,
+    src_clip: vs.VideoNode, credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: int,
+    start_frame: int = 0, expand: int = 2, *, prefilter: bool | int = False,
     func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     func = func or diff_creditless
