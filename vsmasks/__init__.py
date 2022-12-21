@@ -1,5 +1,6 @@
 from .abstract import *  # noqa: F401, F403
 from .details import *  # noqa: F401, F403
+from .diff import *  # noqa: F401, F403
 from .edge import *  # noqa: F401, F403
 from .edge_funcs import *  # noqa: F401, F403
 from .funcs import *  # noqa: F401, F403
