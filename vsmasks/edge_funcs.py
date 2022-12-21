@@ -52,3 +52,29 @@ def ringing_mask(
     return ExprOp.convolution('x', wmean_matrix, premultiply=2, multiply=2, clamp=True)(mask)
 
 
+def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = True) -> vs.VideoNode:
+    peak = get_peak_value(clip)
+
+    lo, hi = (peak, 0) if invert else (0, peak)
+    inv_pre, inv_post = (peak, '-') if invert else ('', '')
+
+    return norm_expr(
+        get_y(clip),
+        f'x {thr_lo} < {lo} x {thr_hi} > {hi} {inv_pre} x {thr_lo} - {thr_lo} {thr_hi} - / {peak} * {inv_post} ? ?'
+    )
+
+
+def luma_credit_mask(
+    clip: vs.VideoNode, thr: int = 230, edgemask: EdgeDetect = FDoGTCanny(), draft: bool = False
+) -> vs.VideoNode:
+    clip = get_y(clip)
+
+    edge_mask = edgemask.edgemask(clip)
+
+    credit_mask = norm_expr([edge_mask, clip], f'y {thr} > y 0 ? x min')
+
+    if not draft:
+        credit_mask = iterate(credit_mask, core.std.Maximum, 4)
+        credit_mask = iterate(credit_mask, core.std.Inflate, 2)
+
+    return credit_mask
