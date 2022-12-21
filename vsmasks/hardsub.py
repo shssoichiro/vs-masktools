@@ -17,8 +17,11 @@ __all__ = [
     'HardsubLine',
     'HardsubLineFade',
     'HardsubASS',
+
     'bounded_dehardsub',
     'diff_hardsub_mask',
+
+    'get_all_sign_masks'
 ]
 
 
@@ -245,3 +248,17 @@ def diff_hardsub_mask(a: vs.VideoNode, b: vs.VideoNode, **kwargs: Any) -> vs.Vid
     return a.std.BlankClip(color=get_neutral_values(a), keep=True).std.MaskedMerge(
         a.std.MakeDiff(b), HardsubLine(**kwargs).get_mask(a, b)
     )
+
+
+def get_all_sign_masks(hrdsb: vs.VideoNode, ref: vs.VideoNode, signs: list[HardsubMask]) -> vs.VideoNode:
+    assert check_variable(hrdsb, get_all_sign_masks)
+    assert check_variable(ref, get_all_sign_masks)
+
+    mask = ref.std.BlankClip(
+        format=ref.format.replace(color_family=vs.GRAY, subsampling_w=0, subsampling_h=0).id, keep=True
+    )
+
+    for sign in signs:
+        mask = replace_ranges(mask, ExprOp.ADD.combine(mask, sign.get_mask(hrdsb, ref)), sign.ranges)
+
+    return mask.std.Limiter()
