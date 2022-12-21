@@ -105,3 +105,26 @@ def diff_creditless_oped(
     raise CustomValueError(
         'You must specify one or both of ("opstart", "opend"), ("edstart", "edend")', func
     )
+
+
+def credit_mask(
+    clip: vs.VideoNode, ref: vs.VideoNode, thr: int | float,
+    blur: float | None = 1.65, prefilter: bool | int = 5,
+    expand: int = 8
+) -> vs.VideoNode:
+    if blur:
+        clip = gauss_blur(clip, blur)
+        ref = gauss_blur(ref, blur)
+
+    ed_mask = diff_creditless(clip, ref, thr, prefilter=prefilter)
+
+    credit_mask, bits = expect_bits(ed_mask)
+    credit_mask = Morpho.erosion(credit_mask, 6)
+    credit_mask = iterate(credit_mask, lambda x: x.std.Minimum().std.Maximum(), 8)
+
+    if expand:
+        credit_mask = Morpho.dilation(credit_mask, expand)
+
+    credit_mask = Morpho.inflate(credit_mask, 3)
+
+    return depth(credit_mask, bits)
