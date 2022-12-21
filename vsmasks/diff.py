@@ -4,10 +4,10 @@ from typing import Any
 
 from vsexprtools import ExprOp
 from vskernels import Bicubic, Catrom, Kernel, KernelT
-from vsrgtools import RemoveGrainMode, bilateral, removegrain
+from vsrgtools import RemoveGrainMode, bilateral, gauss_blur, removegrain
 from vstools import (
     CustomValueError, FuncExceptT, KwargsT, check_variable, depth, expect_bits, get_w, get_y, insert_clip, iterate,
-    scale_value, vs
+    scale_thresh, scale_value, vs
 )
 
 from .edge import ExLaplacian4
@@ -43,13 +43,13 @@ def diff_rescale(
 
 
 def diff_creditless(
-    src_clip: vs.VideoNode, credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: int,
+    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: int | float,
     start_frame: int = 0, expand: int = 2, *, prefilter: bool | int = False,
-    func: FuncExceptT | None = None, **kwargs: Any
+    ep_clip: vs.VideoNode | None = None, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     func = func or diff_creditless
 
-    assert check_variable(src_clip, func)
+    assert check_variable(credit_clip, func)
 
     clips = [credit_clip, nc_clip]
 
@@ -58,7 +58,7 @@ def diff_creditless(
         kwargs |= KwargsT(sigmaS=((sigma ** 2 - 1) / 12) ** 0.5, sigmaR=sigma / 10) | kwargs
         clips = [bilateral(c, **kwargs) for c in clips]
 
-    dst_fmt = src_clip.format.replace(subsampling_w=0, subsampling_h=0)
+    dst_fmt = credit_clip.format.replace(subsampling_w=0, subsampling_h=0)
     diff_fmt = dst_fmt.replace(color_family=vs.GRAY)
 
     diff = ExprOp.mae(dst_fmt)(
@@ -66,13 +66,15 @@ def diff_creditless(
         format=diff_fmt, split_planes=True
     )
 
+    thr = scale_thresh(thr, diff, 16, 1)
+
     mask = ExLaplacian4().edgemask(diff).std.Binarize(thr)
     mask = Morpho.expand(mask, 2 + expand, mode=XxpandMode.ELLIPSE)
 
-    if src_clip.num_frames == mask.num_frames:
+    if not ep_clip or ep_clip.num_frames == mask.num_frames:
         return mask
 
-    blank = src_clip.std.BlankClip(format=diff_fmt.id, keep=True)
+    blank = ep_clip.std.BlankClip(format=diff_fmt.id, keep=True)
 
     return insert_clip(blank, mask, start_frame)
 
@@ -87,13 +89,13 @@ def diff_creditless_oped(
 
     op_mask = ed_mask = None
 
-    kwargs |= KwargsT(thr=25, expand=4, prefilter=False, func=func) | kwargs
+    kwargs |= KwargsT(thr=25, expand=4, prefilter=False, func=func, ep_clip=ep) | kwargs
 
     if opstart is not None and opend is not None:
-        op_mask = diff_creditless(ep, ep[opstart:opend + 1], ncop[:opend - opstart + 1], opstart, **kwargs)
+        op_mask = diff_creditless(ep[opstart:opend + 1], ncop[:opend - opstart + 1], opstart, **kwargs)
 
     if edstart is not None and edend is not None:
-        ed_mask = diff_creditless(ep, ep[edstart:edend + 1], nced[:edend - edstart + 1], edstart, **kwargs)
+        ed_mask = diff_creditless(ep[edstart:edend + 1], nced[:edend - edstart + 1], edstart, **kwargs)
 
     if op_mask and ed_mask:
         return ExprOp.ADD.combine(op_mask, ed_mask)
