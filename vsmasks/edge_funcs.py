@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from functools import partial
 
-from vsexprtools import norm_expr
+from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools.util import wmean_matrix
-from vstools import check_variable, core, depth, get_depth, get_peak_value, iterate, plane, scale_thresh, vs
+from vstools import check_variable, core, depth, get_depth, get_peak_value, get_y, iterate, plane, scale_thresh, vs
 
-from .edge import EdgeDetect, Prewitt
+from vsmasks.morpho import Morpho
+
+from .edge import EdgeDetect, FDoGTCanny, Prewitt
 
 __all__ = [
-    'ringing_mask'
+    'ringing_mask',
+
+    'luma_mask', 'luma_credit_mask'
 ]
 
 
@@ -22,8 +26,6 @@ def ringing_mask(
 ) -> vs.VideoNode:
     assert check_variable(clip, ringing_mask)
 
-    smax = get_peak_value(clip)
-
     thmi, thma, thlimi, thlima = (
         scale_thresh(t, clip) for t in [thmi, thma, thlimi, thlima]
     )
@@ -35,16 +37,18 @@ def ringing_mask(
 
     edgemask = plane(edgemask, 0).std.Limiter()
 
-    light = norm_expr(edgemask, f'x {thlimi} - {thma - thmi} / {smax} *')
-    shrink = iterate(light, core.std.Maximum, rad)
+    light = norm_expr(edgemask, f'x {thlimi} - {thma - thmi} / {ExprToken.RangeMax} *')
+
+    shrink = Morpho.dilation(light, rad)
     shrink = shrink.std.Binarize(scale_thresh(brz, clip))
-    shrink = iterate(shrink, core.std.Minimum, rad)
+    shrink = Morpho.erosion(shrink, 2)
     shrink = iterate(shrink, partial(core.std.Convolution, matrix=wmean_matrix), 2)
 
-    strong = norm_expr(edgemask, f'x {thmi} - {thlima - thlimi} / {smax} *')
-    expand = iterate(strong, core.std.Maximum, rad)
+    strong = norm_expr(edgemask, f'x {thmi} - {thlima - thlimi} / {ExprToken.RangeMax} *')
+    expand = Morpho.dilation(strong, rad)
 
-    mask = norm_expr([expand, strong, shrink], 'x y z max - 2 *')
-    mask = mask.std.Convolution(wmean_matrix)
+    mask = norm_expr([expand, strong, shrink], 'x y z max -')
 
-    return norm_expr(mask, 'x 2 *').std.Limiter()
+    return ExprOp.convolution('x', wmean_matrix, premultiply=2, multiply=2, clamp=True)(mask)
+
+
