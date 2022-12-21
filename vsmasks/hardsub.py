@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from vsexprtools import ExprOp
 from vstools import (
-    FrameRangeN, FrameRangesN, check_variable, core, depth, fallback, get_neutral_values, get_y, iterate,
-    normalize_ranges, replace_ranges, scale_thresh, split, vs
+    FileNotExistsError, FrameRangeN, FrameRangesN, VSFunction, check_variable, core, depth, fallback,
+    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_thresh, split, vs,
+    vs_object
 )
 
-from .abstract import DeferredMask
+from .abstract import DeferredMask, Mask
 
 __all__ = [
+    'HardsubManual',
+
     'HardsubMask',
     'HardsubSignFades',
     'HardsubSign',
@@ -23,6 +28,48 @@ __all__ = [
 
     'get_all_sign_masks'
 ]
+
+
+@dataclass
+class HardsubManual(Mask, vs_object):
+    path: str | Path
+    processing: VSFunction = core.lazy.std.Binarize  # type: ignore
+
+    def __post_init__(self) -> None:
+        if not (path := Path(self.path)).is_dir():
+            raise FileNotExistsError('"path" must be an existing path directory!', self.get_mask)
+
+        files = [file.stem for file in path.glob('*')]
+
+        self.clips = [
+            core.imwri.Read(file) for file in files
+        ]
+
+        self.ranges = [
+            (other[-1] if other else end, end)
+            for (*other, end) in (map(int, name.split('_')) for name in files)
+        ]
+
+    def get_mask(self, clip: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
+        assert check_variable(clip, self.get_mask)
+
+        mask = clip.std.BlankClip(
+            format=clip.format.replace(color_family=vs.GRAY, subsampling_h=0, subsampling_w=0).id,
+            keep=True, color=0
+        )
+
+        for maskclip, (start_frame, end_frame) in zip(self.clips, self.ranges):
+            maskclip = maskclip.std.AssumeFPS(clip).resize.Point(format=mask.format.id)  # type: ignore
+            maskclip = self.processing(maskclip).std.Loop(end_frame - start_frame + 1)
+
+            mask = insert_clip(mask, maskclip, start_frame)
+
+        return mask
+
+    def __vs_del__(self, core_id: int) -> None:
+        super().__vs_del__(core_id)
+
+        self.clips.clear()
 
 
 class HardsubMask(DeferredMask):
