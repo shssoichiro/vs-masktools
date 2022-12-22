@@ -5,7 +5,9 @@ from enum import Enum, auto
 from typing import ClassVar, NoReturn, Sequence, TypeAlias, cast
 
 from vsexprtools import ExprOp
-from vstools import check_variable, core, inject_self, vs
+from vstools import CustomValueError, FuncExceptT, check_variable, core, get_subclasses, inject_self, vs, T
+
+from ..exceptions import UnknownEdgeDetectError
 
 __all__ = [
     'EdgeDetect', 'EdgeDetectT',
@@ -25,10 +27,80 @@ class _Feature(Enum):
     RIDGE = auto()
 
 
+class BaseEdgeDetect:
+    @staticmethod
+    def from_param(
+        cls: type[T],
+        value: str | type[T] | T | None,
+        exception_cls: type[CustomValueError],
+        excluded: Sequence[type[T]] = [],
+        func_except: FuncExceptT | None = None
+    ) -> type[T]:
+        if isinstance(value, str):
+            all_edge_detects = get_subclasses(EdgeDetect, excluded)
+            search_str = value.lower().strip()
+
+            for edge_detect_cls in all_edge_detects:
+                if edge_detect_cls.__name__.lower() == search_str:
+                    return edge_detect_cls  # type: ignore
+
+            raise exception_cls(func_except or cls.from_param, value)  # type: ignore
+
+        if issubclass(value, cls):  # type: ignore
+            return value  # type: ignore
+
+        if isinstance(value, cls):
+            return value.__class__
+
+        return cls
+
+    @staticmethod
+    def ensure_obj(
+        cls: type[T],
+        value: str | type[T] | T | None,
+        exception_cls: type[CustomValueError],
+        excluded: Sequence[type[T]] = [],
+        func_except: FuncExceptT | None = None
+    ) -> T:
+        new_edge_detect: T | None = None
+
+        if not isinstance(value, cls):
+            try:
+                new_edge_detect = cls.from_param(value, func_except)()  # type: ignore
+            except Exception:
+                ...
+        else:
+            new_edge_detect = value
+
+        if new_edge_detect is None:
+            new_edge_detect = cls()
+
+        if new_edge_detect.__class__ in excluded:
+            raise exception_cls(
+                func_except or cls.ensure_obj, new_edge_detect.__class__,  # type: ignore
+                'This {cls_name} can\'t be instantiated to be used!',
+                cls_name=new_edge_detect.__class__
+            )
+
+        return new_edge_detect
+
+
 class EdgeDetect(ABC):
     """Abstract edge detection interface."""
 
     _bits: int
+
+    @classmethod
+    def from_param(
+        cls: type[EdgeDetect], edge_detect: EdgeDetectT | None = None, func_except: FuncExceptT | None = None
+    ) -> type[EdgeDetect]:
+        return BaseEdgeDetect.from_param(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
+
+    @classmethod
+    def ensure_obj(
+        cls: type[EdgeDetect], edge_detect: EdgeDetectT | None = None, func_except: FuncExceptT | None = None
+    ) -> EdgeDetect:
+        return BaseEdgeDetect.ensure_obj(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
 
     @inject_self
     def edgemask(
