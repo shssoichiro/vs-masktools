@@ -11,7 +11,7 @@ from vstools import (
     vs_object
 )
 
-from .abstract import DeferredMask, Mask
+from .abstract import DeferredMask, GeneralMask
 
 __all__ = [
     'HardsubManual',
@@ -31,7 +31,7 @@ __all__ = [
 
 
 @dataclass
-class HardsubManual(Mask, vs_object):
+class HardsubManual(GeneralMask, vs_object):
     path: str | Path
     processing: VSFunction = core.lazy.std.Binarize  # type: ignore
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Sequence
+from typing import Any, Sequence
 
 from vstools import ColorRange, depth, vs
 
@@ -90,11 +90,8 @@ class FDoG(RidgeDetect, EuclidianDistance, Matrix5x5):
 class FDoGTCanny(Matrix5x5, EdgeDetect):
     """Flow-based Difference of Gaussian TCanny Vapoursynth plugin."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=6, scale=0.5)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=6, scale=0.5, **kwargs)
 
 
 class DoG(EuclidianDistance, Matrix5x5):

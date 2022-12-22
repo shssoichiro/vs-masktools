@@ -13,19 +13,19 @@ from vstools import (
 from .utils import squaremask
 
 __all__ = [
-    'Mask',
+    'GeneralMask',
     'BoundingBox',
     'DeferredMask'
 ]
 
 
-class Mask(ABC):
+class GeneralMask(ABC):
     @abstractmethod
-    def get_mask(self, clip: vs.VideoNode, *args: Any) -> vs.VideoNode:
+    def get_mask(self, clip: vs.VideoNode, *args: Any, **kwargs: Any) -> vs.VideoNode:
         ...
 
 
-class BoundingBox(Mask):
+class BoundingBox(GeneralMask):
     pos: Position
     size: Size
     invert: bool
@@ -33,11 +33,11 @@ class BoundingBox(Mask):
     def __init__(self, pos: tuple[int, int] | Position, size: tuple[int, int] | Size, invert: bool = False) -> None:
         self.pos, self.size, self.invert = Position(pos), Size(size), invert
 
-    def get_mask(self, ref: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
+    def get_mask(self, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:  # type: ignore[override]
         return squaremask(ref, self.size.x, self.size.y, self.pos.x, self.pos.y, self.invert, self.get_mask)
 
 
-class DeferredMask(Mask):
+class DeferredMask(GeneralMask):
     ranges: FrameRangesN
     bound: BoundingBox | None
     refframes: list[int | None]
@@ -61,12 +61,12 @@ class DeferredMask(Mask):
                 self.__class__, '', 'Received reference frame and range list size mismatch!'
             )
 
-    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
+    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:  # type: ignore[override]
         assert check_variable(clip, self.get_mask)
         assert check_variable(ref, self.get_mask)
 
         if self.bound:
-            bm = self.bound.get_mask(ref)
+            bm = self.bound.get_mask(ref, **kwargs)
 
             if self.blur:
                 bm = box_blur(bm, 5, 5)
@@ -83,14 +83,14 @@ class DeferredMask(Mask):
                     rf = ref.num_frames - 1 + rf
 
                 mask = depth(
-                    self._mask(clip[rf], ref[rf]), clip,
+                    self._mask(clip[rf], ref[rf], **kwargs), clip,
                     range_out=ColorRange.FULL, range_in=ColorRange.FULL
                 ).std.Loop(hm.num_frames)
 
                 hm = replace_ranges(hm, ExprOp.MAX.combine(hm, mask), ran)
         else:
             hm = depth(
-                self._mask(clip, ref), clip,
+                self._mask(clip, ref, **kwargs), clip,
                 range_out=ColorRange.FULL, range_in=ColorRange.FULL
             )
 
@@ -100,5 +100,5 @@ class DeferredMask(Mask):
         return hm.std.Limiter()
 
     @abstractmethod
-    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
+    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         ...

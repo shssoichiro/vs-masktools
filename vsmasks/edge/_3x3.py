@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from abc import ABC
 from dataclasses import dataclass
-from typing import NoReturn, Sequence
+from typing import Any, NoReturn, Sequence
 
 from vsexprtools import ExprOp
 from vstools import ColorRange, depth, get_depth, join, split, vs
@@ -89,11 +89,8 @@ class TriticalTCanny(Matrix3x3, EdgeDetect):
     Plain and simple orthogonal first order derivative.
     """
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=0)  # TODO add sigma
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=0, **kwargs)
 
 
 class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -120,21 +117,15 @@ class Prewitt(RidgeDetect, EuclidianDistance, Matrix3x3):
 class PrewittStd(Matrix3x3, EdgeDetect):
     """Judith M. S. Prewitt Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.std.Prewitt()
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.std.Prewitt(**kwargs)
 
 
 class PrewittTCanny(Matrix3x3, EdgeDetect):
     """Judith M. S. Prewitt TCanny plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=1, scale=2)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=1, scale=2, **kwargs)
 
 
 class Sobel(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -149,31 +140,24 @@ class Sobel(RidgeDetect, EuclidianDistance, Matrix3x3):
 class SobelStd(Matrix3x3, EdgeDetect):
     """Sobel–Feldman Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.std.Sobel()
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.std.Sobel(**kwargs)
 
 
 class SobelTCanny(Matrix3x3, EdgeDetect):
     """Sobel–Feldman Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=2, scale=2)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=2, scale=2, **kwargs)
 
 
 class ASobel(Matrix3x3, EdgeDetect):
     """Modified Sobel–Feldman operator from AWarpSharp."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return (vs.core.warp.ASobel if get_depth(clip) < 32 else vs.core.warpsf.ASobel)(clip, 255)  # type: ignore
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return (vs.core.warp.ASobel if get_depth(clip) < 32 else vs.core.warpsf.ASobel)(  # type: ignore
+            clip, 255, **kwargs
+        )
 
 
 class Scharr(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -205,11 +189,8 @@ class RScharr(RidgeDetect, EuclidianDistance, Matrix3x3):
 class ScharrTCanny(Matrix3x3, EdgeDetect):
     """H. Scharr optimised TCanny Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=2, scale=4 / 3)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=2, scale=4 / 3, **kwargs)
 
 
 class Kroon(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -225,11 +206,8 @@ class Kroon(RidgeDetect, EuclidianDistance, Matrix3x3):
 class KroonTCanny(Matrix3x3, EdgeDetect):
     """Dirk-Jan Kroon TCanny Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=4, scale=1 / 17)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=4, scale=1 / 17, **kwargs)
 
 
 class FreyChen(MatrixEdgeDetect):
@@ -337,11 +315,8 @@ class Kirsch(Max, Matrix3x3):
 class KirschTCanny(Matrix3x3, EdgeDetect):
     """Russell Kirsch compass TCanny Vapoursynth plugin operator."""
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return clip.tcanny.TCanny(0, mode=1, op=5)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=5, **kwargs)
 
 
 # Misc
@@ -352,17 +327,14 @@ class MinMax(EdgeDetect):
     rady: int = 2
     radc: int = 0
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         assert clip.format
 
         return join([
             ExprOp.SUB.combine(
-                Morpho.expand(p, rad, rad, XxpandMode.ELLIPSE),
-                Morpho.inpand(p, rad, rad, XxpandMode.ELLIPSE)
+                Morpho.expand(p, rad, rad, XxpandMode.ELLIPSE, **kwargs),
+                Morpho.inpand(p, rad, rad, XxpandMode.ELLIPSE, **kwargs)
             ) if rad > 0 else p for p, rad in zip(
                 split(clip), (self.rady, self.radc, self.radc)[:clip.format.num_planes]
             )
         ], clip.format.color_family)
-
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError

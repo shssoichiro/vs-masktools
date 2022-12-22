@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import ClassVar, NoReturn, Sequence, TypeAlias, cast
+from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias, cast
 
 from vsexprtools import ExprOp
-from vstools import CustomValueError, FuncExceptT, check_variable, core, get_subclasses, inject_self, vs, T
+from vstools import CustomValueError, FuncExceptT, T, check_variable, core, get_subclasses, inject_self, vs
 
 from ..exceptions import UnknownEdgeDetectError
 
@@ -105,7 +105,7 @@ class EdgeDetect(ABC):
     @inject_self
     def edgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
+        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, **kwargs: Any
     ) -> vs.VideoNode:
         """
         Makes edge mask based on convolution kernel.
@@ -119,28 +119,7 @@ class EdgeDetect(ABC):
 
         :return:                Mask clip
         """
-        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.EDGE)
-
-    def ridgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
-    ) -> vs.VideoNode | NoReturn:
-        """
-        Makes ridge mask based on convolution kernel.
-        The resulting mask can be thresholded with lthr, hthr and multiplied with multi.
-
-        :param clip:            Source clip
-        :param lthr:            Low threshold. Anything below lthr will be set to 0
-        :param hthr:            High threshold. Anything above hthr will be set to the range max
-        :param multi:           Multiply all pixels by this before thresholding
-        :param clamp:           Clamp to TV or full range if True or specified range `(low, high)`
-
-        :return:                Mask clip
-        """
-        raise NotImplementedError
+        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.EDGE, **kwargs)
 
     def _mask(
         self,
@@ -148,7 +127,7 @@ class EdgeDetect(ABC):
         lthr: float = 0.0, hthr: float | None = None,
         multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
-        feature: _Feature = _Feature.EDGE
+        feature: _Feature = _Feature.EDGE, **kwargs: Any
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
 
@@ -158,10 +137,14 @@ class EdgeDetect(ABC):
         hthr = peak if hthr is None else hthr
 
         clip_p = self._preprocess(clip)
+
         if feature == _Feature.EDGE:
-            mask = self._compute_edge_mask(clip_p)
+            mask = self._compute_edge_mask(clip_p, **kwargs)
         elif feature == _Feature.RIDGE:
-            mask = self._compute_ridge_mask(clip_p)
+            if not isinstance(self, RidgeDetect):
+                raise RuntimeError
+            mask = self._compute_ridge_mask(clip_p, **kwargs)
+
         mask = self._postprocess(mask)
 
         if multi != 1:
@@ -203,13 +186,10 @@ class EdgeDetect(ABC):
         return mask
 
     @abstractmethod
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         raise NotImplementedError
 
     @abstractmethod
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
-        raise NotImplementedError
-
     def _preprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
         return clip
 
@@ -222,13 +202,13 @@ class MatrixEdgeDetect(EdgeDetect, ABC):
     divisors: ClassVar[Sequence[float] | None] = None
     mode_types: ClassVar[Sequence[str] | None] = None
 
-    def _compute_edge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         return self._merge_edge([
             clip.std.Convolution(matrix=mat, divisor=div, saturate=False, mode=mode)
             for mat, div, mode in zip(self._get_matrices(), self._get_divisors(), self._get_mode_types())
         ])
 
-    def _compute_ridge_mask(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _compute_ridge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         def _x(c: vs.VideoNode) -> vs.VideoNode:
             return c.std.Convolution(matrix=self._get_matrices()[0], divisor=self._get_divisors()[0])
 
@@ -268,30 +248,30 @@ class MatrixEdgeDetect(EdgeDetect, ABC):
 
 
 class RidgeDetect(MatrixEdgeDetect):
+    @inject_self
     def ridgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
-    ) -> vs.VideoNode:
-        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.RIDGE)
+        self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
+        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, **kwargs: Any
+    ) -> vs.VideoNode | NoReturn:
+        """
+        Makes ridge mask based on convolution kernel.
+        The resulting mask can be thresholded with lthr, hthr and multiplied with multi.
+
+        :param clip:            Source clip
+        :param lthr:            Low threshold. Anything below lthr will be set to 0
+        :param hthr:            High threshold. Anything above hthr will be set to the range max
+        :param multi:           Multiply all pixels by this before thresholding
+        :param clamp:           Clamp to TV or full range if True or specified range `(low, high)`
+
+        :return:                Mask clip
+        """
+        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.RIDGE, **kwargs)
 
     def _merge_ridge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
-        # return core.std.Expr(clips, 'x dup * z dup * 4 * + x y * 2 * - y dup * + sqrt x y + +')
         return core.std.Expr(clips, 'x y * 2 * -1 * x dup * z dup * 4 * + y dup * + + sqrt x y + +')
 
 
 class SingleMatrix(MatrixEdgeDetect, ABC):
-    def ridgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
-    ) -> vs.VideoNode | NoReturn:
-        raise NotImplementedError
-
     def _merge_edge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
         return clips[0]
 
@@ -300,15 +280,6 @@ class SingleMatrix(MatrixEdgeDetect, ABC):
 
 
 class EuclidianDistance(MatrixEdgeDetect, ABC):
-    def ridgemask(
-        self,
-        clip: vs.VideoNode,
-        lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
-    ) -> vs.VideoNode | NoReturn:
-        raise NotImplementedError
-
     def _merge_edge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
         return core.std.Expr(clips, 'x x * y y * + sqrt')
 
@@ -317,12 +288,6 @@ class EuclidianDistance(MatrixEdgeDetect, ABC):
 
 
 class Max(MatrixEdgeDetect, ABC):
-    def ridgemask(
-        self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None,
-        multi: float = 1.0, clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
-    ) -> vs.VideoNode | NoReturn:
-        raise NotImplementedError
-
     def _merge_edge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
         return ExprOp.MAX.combine(*clips)
 
@@ -369,9 +334,7 @@ def get_all_edge_detects(
 
 
 def get_all_ridge_detect(
-    clip: vs.VideoNode,
-    lthr: float = 0.0, hthr: float | None = None,
-    multi: float = 1.0,
+    clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
     clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
 ) -> list[vs.VideoNode]:
     """
