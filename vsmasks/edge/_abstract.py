@@ -5,7 +5,7 @@ from enum import Enum, auto
 from typing import ClassVar, NoReturn, Sequence, TypeAlias, cast
 
 from vsexprtools import ExprOp
-from vstools import check_variable, core, vs
+from vstools import check_variable, core, inject_self, vs
 
 __all__ = [
     'EdgeDetect', 'EdgeDetectT',
@@ -30,6 +30,7 @@ class EdgeDetect(ABC):
 
     _bits: int
 
+    @inject_self
     def edgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False
