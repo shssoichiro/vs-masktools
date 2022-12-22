@@ -7,7 +7,7 @@ from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias, cast
 from vsexprtools import ExprOp
 from vstools import CustomValueError, FuncExceptT, T, check_variable, core, get_subclasses, inject_self, vs
 
-from ..exceptions import UnknownEdgeDetectError
+from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
 
 __all__ = [
     'EdgeDetect', 'EdgeDetectT',
@@ -27,7 +27,7 @@ class _Feature(Enum):
     RIDGE = auto()
 
 
-class BaseEdgeDetect:
+class BaseDetect:
     @staticmethod
     def from_param(
         cls: type[T],
@@ -94,13 +94,13 @@ class EdgeDetect(ABC):
     def from_param(
         cls: type[EdgeDetect], edge_detect: EdgeDetectT | None = None, func_except: FuncExceptT | None = None
     ) -> type[EdgeDetect]:
-        return BaseEdgeDetect.from_param(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
+        return BaseDetect.from_param(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
 
     @classmethod
     def ensure_obj(
         cls: type[EdgeDetect], edge_detect: EdgeDetectT | None = None, func_except: FuncExceptT | None = None
     ) -> EdgeDetect:
-        return BaseEdgeDetect.ensure_obj(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
+        return BaseDetect.ensure_obj(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
 
     @inject_self
     def edgemask(
@@ -189,7 +189,6 @@ class EdgeDetect(ABC):
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         raise NotImplementedError
 
-    @abstractmethod
     def _preprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
         return clip
 
@@ -197,7 +196,7 @@ class EdgeDetect(ABC):
         return clip
 
 
-class MatrixEdgeDetect(EdgeDetect, ABC):
+class MatrixEdgeDetect(EdgeDetect):
     matrices: ClassVar[Sequence[Sequence[float]]]
     divisors: ClassVar[Sequence[float] | None] = None
     mode_types: ClassVar[Sequence[str] | None] = None
@@ -248,6 +247,18 @@ class MatrixEdgeDetect(EdgeDetect, ABC):
 
 
 class RidgeDetect(MatrixEdgeDetect):
+    @classmethod
+    def from_param(  # type: ignore
+        cls: type[RidgeDetect], edge_detect: RidgeDetectT | None = None, func_except: FuncExceptT | None = None
+    ) -> type[RidgeDetect]:
+        return BaseDetect.from_param(cls, edge_detect, UnknownRidgeDetectError, [], func_except)
+
+    @classmethod
+    def ensure_obj(  # type: ignore
+        cls: type[RidgeDetect], edge_detect: RidgeDetectT | None = None, func_except: FuncExceptT | None = None
+    ) -> RidgeDetect:
+        return BaseDetect.ensure_obj(cls, edge_detect, UnknownRidgeDetectError, [], func_except)
+
     @inject_self
     def ridgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
