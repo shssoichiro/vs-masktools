@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
 from vsexprtools import ExprOp, aka_expr_available, norm_expr
 from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
     CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable, check_variable_format, flatten,
-    get_peak_value, insert_clip, replace_ranges, split, vs
+    get_peak_value, insert_clip, replace_ranges, split, vs, depth
 )
+
+from .edge import EdgeDetect, RidgeDetect
+from .types import GenericMaskT
+from .abstract import GeneralMask
 
 __all__ = [
     'max_planes',
@@ -16,6 +20,8 @@ __all__ = [
     'region_rel_mask', 'region_abs_mask',
 
     'squaremask', 'replace_squaremask', 'freeze_replace_squaremask',
+
+    'normalize_mask'
 ]
 
 
@@ -141,3 +147,31 @@ def freeze_replace_squaremask(
     masked_insert = replace_squaremask(mask[frame], insert[frame], mask_params)
 
     return insert_clip(mask, masked_insert * (end - start + 1), start)
+
+
+def normalize_mask(
+    mask: GenericMaskT, clip: vs.VideoNode, ref: vs.VideoNode | None = None,
+    *, ridge: bool = False, **kwargs: Any
+) -> vs.VideoNode:
+    if isinstance(mask, str):
+        mask = EdgeDetect.ensure_obj(mask)
+
+    if isinstance(mask, type):
+        mask = mask()
+
+    if isinstance(mask, RidgeDetect) and ridge:
+        mask = mask.ridgemask(clip, **kwargs)
+
+    if isinstance(mask, EdgeDetect):
+        mask = mask.edgemask(clip, **kwargs)
+
+    if isinstance(mask, GeneralMask):
+        mask = mask.get_mask(clip, ref)
+
+    if callable(mask):
+        if ref is None:
+            raise CustomValueError('This mask function requires a ref to be specified!')
+
+        mask = mask(clip, ref)
+
+    return depth(mask, clip)
