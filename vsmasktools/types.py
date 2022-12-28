@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Callable, Protocol, Union
+from vsmasktools import EdgeDetectT, RidgeDetectT
 
 from vstools import CustomEnum, PlanesT, SingleOrArrOpt, vs
+
+from .abstract import GeneralMask
 
 __all__ = [
     'MorphoFunc',
     'XxpandMode',
-    'Coordinates'
+    'Coordinates',
+
+    'GenericMaskT'
 ]
 
 
@@ -49,3 +54,9 @@ class Coordinates(list[int], CustomEnum):
             return Coordinates.DIAMOND
 
         return Coordinates.RECTANGLE
+
+
+GenericMaskT = Union[
+    vs.VideoNode, Callable[[vs.VideoNode, vs.VideoNode], vs.VideoNode],
+    EdgeDetectT, RidgeDetectT, GeneralMask, str
+]
