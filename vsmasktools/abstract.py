@@ -10,7 +10,6 @@ from vstools import (
     normalize_seq, replace_ranges, vs
 )
 
-from .utils import squaremask
 
 __all__ = [
     'GeneralMask',
@@ -33,7 +32,8 @@ class BoundingBox(GeneralMask):
     def __init__(self, pos: tuple[int, int] | Position, size: tuple[int, int] | Size, invert: bool = False) -> None:
         self.pos, self.size, self.invert = Position(pos), Size(size), invert
 
-    def get_mask(self, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:  # type: ignore[override]
+    def get_mask(self, ref: vs.VideoNode, *args: Any, **kwargs: Any) -> vs.VideoNode:  # type: ignore[override]
+        from .utils import squaremask
         return squaremask(ref, self.size.x, self.size.y, self.pos.x, self.pos.y, self.invert, self.get_mask)
 
 

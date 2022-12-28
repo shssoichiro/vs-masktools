@@ -50,7 +50,7 @@ class HardsubManual(GeneralMask, vs_object):
             for (*other, end) in (map(int, name.split('_')) for name in files)
         ]
 
-    def get_mask(self, clip: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
+    def get_mask(self, clip: vs.VideoNode, *args: Any) -> vs.VideoNode:  # type: ignore[override]
         assert check_variable(clip, self.get_mask)
 
         mask = clip.std.BlankClip(
