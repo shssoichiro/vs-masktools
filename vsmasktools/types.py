@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import Callable, Protocol, Union
-from vsmasktools import EdgeDetectT, RidgeDetectT
 
 from vstools import CustomEnum, PlanesT, SingleOrArrOpt, vs
 
 from .abstract import GeneralMask
+from .edge._abstract import EdgeDetectT, RidgeDetectT
 
 __all__ = [
     'MorphoFunc',
