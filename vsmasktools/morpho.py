@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import zip_longest
+from math import floor, sqrt
 from typing import Any, Literal, Sequence
 
 from vsexprtools import ExprList, ExprOp, ExprToken, aka_expr_available, norm_expr
@@ -100,12 +101,12 @@ class Morpho:
                 exclude.append((radius, radius - 1))
         else:
             coords = list(coords)
-            radius, mode = 3, ConvMode.SQUARE
+            coords.insert(len(coords) // 2, 1)
+            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.SQUARE
 
         matrix = ExprOp.matrix('x', radius, mode, exclude)
 
         if not isinstance(coords, (int, tuple)):
-            matrix.insert(len(matrix) // 2, 1)
             matrix = ExprList([x for x, coord in zip(matrix, coords) if coord])
 
         matrix = ExprList(interleave_arr(matrix, op * matrix.mlength, 2))
