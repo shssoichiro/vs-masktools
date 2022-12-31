@@ -263,12 +263,12 @@ class Morpho:
     @inject_self
     @copy_signature(_morpho_method2)
     def expand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self.xxpand_transform(clip, ExprOp.MIN, *args, func=func, **kwargs)
+        return self.xxpand_transform(clip, ExprOp.MAX, *args, func=func, **kwargs)
 
     @inject_self
     @copy_signature(_morpho_method2)
     def inpand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self.xxpand_transform(clip, ExprOp.MAX, *args, func=func, **kwargs)
+        return self.xxpand_transform(clip, ExprOp.MIN, *args, func=func, **kwargs)
 
     @inject_self
     @copy_signature(_morpho_method)
