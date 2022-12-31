@@ -123,8 +123,8 @@ class Morpho:
         return matrix
 
     def _mm_func(
-        self, src: vs.VideoNode, radius: int, planes: PlanesT, thr: int | float | None,
-        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None,
+        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT, mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX],
         **kwargs: Any
     ) -> vs.VideoNode:
