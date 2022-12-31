@@ -65,7 +65,7 @@ def retinex(
 
     y = get_y(clip)
 
-    if not aka_expr_available:
+    if not aka_expr_available or not hasattr(vs.core, 'psm'):
         if fast:
             raise CustomRuntimeError(
                 "You don't have akarin plugin, you can't use this function!", func, 'fast=True'
