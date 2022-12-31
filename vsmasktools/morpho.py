@@ -80,7 +80,8 @@ class Morpho:
     @classmethod
     def _morpho_xx_imum(
         cls, thr: int | float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
-        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None
+        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None,
+        clamp: bool = False
     ) -> StrList:
         exclude = list[tuple[int, int]]()
 
@@ -114,6 +115,9 @@ class Morpho:
 
         if multiply is not None:
             matrix.append(multiply, ExprOp.MUL)
+
+        if clamp:
+            matrix.append(ExprOp.clamp())
 
         return matrix
 
