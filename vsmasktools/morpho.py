@@ -305,9 +305,10 @@ class Morpho:
 
         if radius == 1 and self._fast:
             return norm_expr(
-                src, '{dilated} {eroded} -', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords),
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords)
+                src, '{dilated} {eroded} - {multiply}', planes,
+                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords, None, True),
+                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords, None, True),
+                multiply='' if multiply is None else f'{multiply} *'
             )
 
         eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
@@ -339,8 +340,9 @@ class Morpho:
 
         if radius == 1 and self._fast:
             return norm_expr(
-                src, '{dilated} x -', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords)
+                src, '{dilated} {multiply} x -', planes,
+                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords, None, True),
+                multiply='' if multiply is None else f'{multiply} *'
             )
 
         dilated = self.dilation(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
@@ -357,8 +359,9 @@ class Morpho:
 
         if radius == 1 and self._fast:
             return norm_expr(
-                src, '{eroded} x -', planes,
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords)
+                src, '{eroded} {multiply} x -', planes,
+                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords),
+                multiply='' if multiply is None else f'{multiply} *'
             )
 
         eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
