@@ -33,14 +33,16 @@ def diff_rescale(
 
     kernel = Kernel.ensure_obj(kernel, func)
 
-    pre, bits = expect_bits(get_y(clip), 32)
+    y = get_y(clip)
+
+    pre, bits = expect_bits(y, 32)
 
     thr = scale_value(thr, bits, 32, scale_offsets=True)
 
     descale = kernel.descale(pre, get_w(height), height)
-    rescale = kernel.scale(descale, clip.width, clip.height)
+    rescale = kernel.scale(descale, y.width, y.height)
 
-    diff = ExprOp.mae(clip)(pre, rescale)
+    diff = ExprOp.mae(y)(pre, rescale)
 
     mask = iterate(diff, removegrain, 2, RemoveGrainMode.MINMAX_AROUND2)
     mask = mask.std.Expr(f'x 2 4 pow * {thr} < 0 1 ?')
