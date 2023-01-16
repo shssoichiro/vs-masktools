@@ -99,7 +99,7 @@ def squaremask(
     if aka_expr_available:
         mask = norm_expr(
             base_clip, _get_region_expr(
-                clip, offset_y, clip.width - width - offset_x, offset_x, clip.height - height - offset_y,
+                clip, offset_x, clip.width - width - offset_x, offset_y, clip.height - height - offset_y,
                 'range_max x' if invert else 'x range_max'
             ), force_akarin=func
         )
