@@ -76,7 +76,7 @@ def diff_creditless(
         format=diff_fmt, split_planes=True
     )
 
-    thr = scale_thresh(thr, diff, 16, 1)
+    thr = scale_thresh(thr, diff)
 
     mask = ExLaplacian4().edgemask(diff).std.Binarize(thr)
     mask = Morpho.expand(mask, 2 + expand, mode=XxpandMode.ELLIPSE)
