@@ -119,7 +119,7 @@ def squaremask(
 def replace_squaremask(
     clipa: vs.VideoNode, clipb: vs.VideoNode, mask_params: tuple[int, int, int, int],
     ranges: FrameRangeN | FrameRangesN | None = None, blur_sigma: int | float | None = None,
-    invert: bool = False, func: FuncExceptT | None = None
+    invert: bool = False, func: FuncExceptT | None = None, show_mask: bool = False
 ) -> vs.VideoNode:
     func = func or replace_squaremask
 
@@ -135,7 +135,12 @@ def replace_squaremask(
     elif isinstance(blur_sigma, float):
         mask = gauss_blur(mask, blur_sigma)
 
-    merge = clipa.std.MaskedMerge(clipb, mask.std.Loop(clipa.num_frames))
+    mask = mask.std.Loop(clipa.num_frames)
+
+    if show_mask:
+        return mask
+
+    merge = clipa.std.MaskedMerge(clipb, mask)
 
     return replace_ranges(clipa, merge, ranges)
 
