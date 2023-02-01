@@ -5,7 +5,9 @@ from enum import Enum, auto
 from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias, cast
 
 from vsexprtools import ExprOp
-from vstools import CustomValueError, FuncExceptT, T, check_variable, core, get_subclasses, inject_self, vs
+from vstools import (
+    CustomRuntimeError, CustomValueError, FuncExceptT, T, check_variable, core, get_subclasses, inject_self, vs
+)
 
 from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
 
@@ -138,12 +140,15 @@ class EdgeDetect(ABC):
 
         clip_p = self._preprocess(clip)
 
-        if feature == _Feature.EDGE:
-            mask = self._compute_edge_mask(clip_p, **kwargs)
-        elif feature == _Feature.RIDGE:
-            if not isinstance(self, RidgeDetect):
-                raise RuntimeError
-            mask = self._compute_ridge_mask(clip_p, **kwargs)
+        try:
+            if feature == _Feature.EDGE:
+                mask = self._compute_edge_mask(clip_p, **kwargs)
+            elif feature == _Feature.RIDGE:
+                if not isinstance(self, RidgeDetect):
+                    raise RuntimeError
+                mask = self._compute_ridge_mask(clip_p, **kwargs)
+        except Exception as e:
+            raise CustomRuntimeError('There was an error processing the mask! Are you using an abstract class?') from e
 
         mask = self._postprocess(mask)
 
