@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias, cast
+from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias
 
-from vsexprtools import ExprOp
+from vsexprtools import ExprOp, ExprToken, norm_expr
 from vstools import (
-    CustomRuntimeError, CustomValueError, FuncExceptT, T, check_variable, core, get_subclasses, inject_self, vs
+    ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, PlanesT, T, check_variable, core, get_lowest_values,
+    get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane, vs
 )
 
 from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
@@ -107,7 +108,8 @@ class EdgeDetect(ABC):
     @inject_self
     def edgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, **kwargs: Any
+        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, planes: PlanesT = None,
+        **kwargs: Any
     ) -> vs.VideoNode:
         """
         Makes edge mask based on convolution kernel.
@@ -121,7 +123,7 @@ class EdgeDetect(ABC):
 
         :return:                Mask clip
         """
-        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.EDGE, **kwargs)
+        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.EDGE, planes, **kwargs)
 
     def _mask(
         self,
@@ -129,16 +131,19 @@ class EdgeDetect(ABC):
         lthr: float = 0.0, hthr: float | None = None,
         multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
-        feature: _Feature = _Feature.EDGE, **kwargs: Any
+        feature: _Feature = _Feature.EDGE, planes: PlanesT = None, **kwargs: Any
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
 
         self._bits = clip.format.bits_per_sample
-        is_float = clip.format.sample_type == vs.FLOAT
-        peak = 1.0 if is_float else (1 << self._bits) - 1
+        peak = get_peak_value(clip)
         hthr = peak if hthr is None else hthr
 
-        clip_p = self._preprocess(clip)
+        planes = normalize_planes(clip, planes)
+
+        wclip = plane(clip, planes[0]) if len(planes) == 1 else clip
+
+        clip_p = self._preprocess(wclip)
 
         try:
             if feature == _Feature.EDGE:
@@ -153,40 +158,25 @@ class EdgeDetect(ABC):
         mask = self._postprocess(mask)
 
         if multi != 1:
-            if is_float:
-                mask = mask.std.Expr(f'x {multi} *')
-            else:
-                def _multi_func(x: int) -> int:
-                    return round(max(min(x * multi, peak), 0))
-                mask = mask.std.Lut(function=_multi_func)
+            mask = ExprOp.MUL(mask, suffix=multi, planes=planes)
 
         if lthr > 0 or hthr < peak:
-            if is_float:
-                mask = mask.std.Expr(f'x {hthr} > {peak} x {lthr} <= 0 x ? ?')
-            else:
-                def _thr_func(x: int) -> int | float:
-                    return peak if x > hthr else 0 if x <= lthr else x  # type: ignore[operator]
-                mask = mask.std.Lut(function=_thr_func)
+            mask = norm_expr(mask, f'x {hthr} > {ExprToken.RangeMax} x {lthr} < 0 x ? ?', planes)
 
         if clamp:
-            if isinstance(clamp, list):
-                mask = core.std.Expr(mask, ['x {} max {} min'.format(*c) for c in clamp])
-            if isinstance(clamp, tuple):
-                mask = core.std.Expr(mask, 'x {} max {} min'.format(*clamp))
-            else:
-                assert mask.format
-                if is_float:
-                    clamp_vals = [(0., 1.), (-0.5, 0.5), (-0.5, 0.5)]
-                else:
-                    with mask.get_frame(0) as f:
-                        crange = cast(int, f.props['_ColorRange'])
-                    clamp_vals = [(0, peak)] * 3 if crange == 0 else [
-                        (16 << self._bits - 8, 235 << self._bits - 8),
-                        (16 << self._bits - 8, 240 << self._bits - 8),
-                        (16 << self._bits - 8, 240 << self._bits - 8)
-                    ]
+            if clamp is True:
+                crange = ColorRange.from_video(clip)
+                clamp = list(zip(get_lowest_values(mask, crange), get_peak_values(mask, crange)))
 
-                mask = core.std.Expr(mask, ['x {} max {} min'.format(*c) for c in clamp_vals[:mask.format.num_planes]])
+            if isinstance(clamp, list):
+                mask = norm_expr(mask, [ExprOp.clamp(*c, c='x') for c in clamp], planes)
+            elif isinstance(clamp, tuple):
+                mask = ExprOp.clamp(*clamp, c='x')(mask, planes=planes)
+
+        assert mask.format
+
+        if mask.format.num_planes != clip.format.num_planes:
+            return join({None: clip.std.BlankClip(color=[0] * clip.format.num_planes, keep=True), planes[0]: mask})
 
         return mask
 
