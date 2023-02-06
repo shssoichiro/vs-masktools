@@ -9,7 +9,7 @@ from vsexprtools import ExprList, ExprOp, ExprToken, aka_expr_available, norm_ex
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
-    inject_self, interleave_arr, iterate, vs
+    inject_self, interleave_arr, iterate, scale_value, to_arr, vs
 )
 
 from .types import Coordinates, MorphoFunc, XxpandMode
@@ -21,7 +21,7 @@ __all__ = [
 
 
 def _minmax_method(  # type: ignore
-    self: Morpho, src: vs.VideoNode, thr: int | float | None = None,
+    self: Morpho, src: vs.VideoNode, thr: float | None = None,
     coords: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
     iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
@@ -30,7 +30,7 @@ def _minmax_method(  # type: ignore
 
 
 def _morpho_method(  # type: ignore
-    self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+    self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
     coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -54,7 +54,7 @@ class Morpho:
         self._fast = fallback(self.fast, aka_expr_available) and aka_expr_available
 
     def _check_params(
-        self, radius: int, thr: int | float | None, coords: int | tuple[int, ConvMode] | Sequence[int],
+        self, radius: int, thr: float | None, coords: int | tuple[int, ConvMode] | Sequence[int],
         planes: PlanesT, func: FuncExceptT
     ) -> tuple[FuncExceptT, PlanesT]:
         if radius < 1:
@@ -80,7 +80,7 @@ class Morpho:
 
     @classmethod
     def _morpho_xx_imum(
-        cls, thr: int | float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
+        cls, src: vs.VideoNode, thr: float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
         coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None,
         clamp: bool = False
     ) -> StrList:
@@ -112,7 +112,7 @@ class Morpho:
         matrix = ExprList(interleave_arr(matrix, op * matrix.mlength, 2))
 
         if thr is not None:
-            matrix.append('x', thr, ExprOp.SUB, ExprOp.MAX)
+            matrix.append('x', scale_value(thr, 32, src), ExprOp.SUB, ExprOp.MAX)
 
         if multiply is not None:
             matrix.append(multiply, ExprOp.MUL)
@@ -123,7 +123,7 @@ class Morpho:
         return matrix
 
     def _mm_func(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
         coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT, mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX],
         **kwargs: Any
@@ -132,7 +132,7 @@ class Morpho:
 
         if self._fast:
             mm_func = norm_expr  # type: ignore[assignment]
-            kwargs.update(expr=self._morpho_xx_imum(thr, op, coords, multiply))
+            kwargs.update(expr=self._morpho_xx_imum(src, thr, op, coords, multiply))
         elif isinstance(coords, (int, tuple)):
             if isinstance(coords, tuple):
                 if coords[1] is not ConvMode.SQUARE:
@@ -148,22 +148,25 @@ class Morpho:
                 )
 
             kwargs.update(coords=[1] * 8)
+        if not self._fast:
+            if thr is not None:
+                kwargs.update(threshold=scale_value(thr, 32, src))
 
-        if not self._fast and multiply is not None:
-            orig_mm_func = mm_func
+            if multiply is not None:
+                orig_mm_func = mm_func
 
-            @copy_signature(mm_func)
-            def _mm_func(*args: Any, **kwargs: Any) -> Any:
-                return orig_mm_func(*args, **kwargs).std.Expr(f'x {multiply} *')
+                @copy_signature(mm_func)
+                def _mm_func(*args: Any, **kwargs: Any) -> Any:
+                    return orig_mm_func(*args, **kwargs).std.Expr(f'x {multiply} *')
 
-            mm_func = _mm_func
+                mm_func = _mm_func
 
         return iterate(src, mm_func, radius, planes=planes, **kwargs)
 
     @inject_self
     def xxpand_transform(
         self, clip: vs.VideoNode, op: Literal[ExprOp.MIN, ExprOp.MAX], sw: int, sh: int | None = None,
-        mode: XxpandMode = XxpandMode.RECTANGLE, thr: int | None = None,
+        mode: XxpandMode = XxpandMode.RECTANGLE, thr: float | None = None,
         planes: PlanesT = None, *, func: FuncExceptT | None = None
     ) -> vs.VideoNode:
         func, planes = self._check_params(1, thr, 3, planes, func or self.xxpand_transform)
@@ -190,7 +193,7 @@ class Morpho:
         return clip
 
     def _xxflate(
-        self: Morpho, inflate: bool, src: vs.VideoNode, radius: int, planes: PlanesT, thr: int | float | None,
+        self: Morpho, inflate: bool, src: vs.VideoNode, radius: int, planes: PlanesT, thr: float | None,
         multiply: float | None, *, func: FuncExceptT
     ) -> vs.VideoNode:
         assert check_variable(src, func)
@@ -208,6 +211,7 @@ class Morpho:
         expr.append('x', ExprOp.MAX if inflate else ExprOp.MIN)
 
         if thr is not None:
+            thr = scale_value(thr, 32, src)
             limit = ['x', thr, ExprOp.ADD] if inflate else ['x', thr, ExprOp.SUB, ExprToken.RangeMin, ExprOp.MAX]
 
             expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
@@ -220,7 +224,7 @@ class Morpho:
     @inject_self
     @copy_signature(_minmax_method)
     def maximum(
-        self, src: vs.VideoNode, thr: int | float | None = None,
+        self, src: vs.VideoNode, thr: float | None = None,
         coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
@@ -230,7 +234,7 @@ class Morpho:
     @inject_self
     @copy_signature(_minmax_method)
     def minimum(
-        self, src: vs.VideoNode, thr: int | float | None = None,
+        self, src: vs.VideoNode, thr: float | None = None,
         coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
@@ -239,7 +243,7 @@ class Morpho:
 
     @inject_self
     def inflate(
-        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
         iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
     ) -> vs.VideoNode:
         for _ in range(iterations):
@@ -248,7 +252,7 @@ class Morpho:
 
     @inject_self
     def deflate(
-        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
         iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
     ) -> vs.VideoNode:
         for _ in range(iterations):
@@ -297,7 +301,7 @@ class Morpho:
 
     @inject_self
     def gradient(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
         coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
@@ -306,8 +310,8 @@ class Morpho:
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{dilated} {eroded} - {multiply}', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords, None, True),
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords, None, True),
+                dilated=self._morpho_xx_imum(src, thr, ExprOp.MAX, coords, None, True),
+                eroded=self._morpho_xx_imum(src, thr, ExprOp.MIN, coords, None, True),
                 multiply='' if multiply is None else f'{multiply} *'
             )
 
@@ -341,7 +345,7 @@ class Morpho:
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{dilated} {multiply} x -', planes,
-                dilated=self._morpho_xx_imum(thr, ExprOp.MAX, coords, None, True),
+                dilated=self._morpho_xx_imum(src, thr, ExprOp.MAX, coords, None, True),
                 multiply='' if multiply is None else f'{multiply} *'
             )
 
@@ -351,7 +355,7 @@ class Morpho:
 
     @inject_self
     def inner_hat(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
+        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
         coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
@@ -360,7 +364,7 @@ class Morpho:
         if radius == 1 and self._fast:
             return norm_expr(
                 src, '{eroded} {multiply} x -', planes,
-                eroded=self._morpho_xx_imum(thr, ExprOp.MIN, coords),
+                eroded=self._morpho_xx_imum(src, thr, ExprOp.MIN, coords),
                 multiply='' if multiply is None else f'{multiply} *'
             )
 
