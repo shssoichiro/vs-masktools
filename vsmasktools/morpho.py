@@ -373,6 +373,21 @@ class Morpho:
 
         return norm_expr([eroded, src], 'x y -', planes)
 
+    @inject_self
+    def binarize(
+        self, src: vs.VideoNode, midthr: float | list[float] | None = None,
+        lowthr: float | list[float] | None = None, highthr: float | list[float] | None = None,
+        planes: PlanesT = None
+    ) -> vs.VideoNode:
+        midthr, lowthr, highthr = (
+            thr and list(
+                scale_value(t, 32, src, chroma=i != 0)
+                for i, t in enumerate(to_arr(thr))
+            ) for thr in (midthr, lowthr, highthr)
+        )
+
+        return src.std.Binarize(midthr, lowthr, highthr, planes)
+
 
 def grow_mask(
     mask: vs.VideoNode, radius: int = 1, multiply: float = 1.0,
