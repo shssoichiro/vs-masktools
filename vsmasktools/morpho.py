@@ -370,17 +370,17 @@ class Morpho:
     @inject_self
     def binarize(
         self, src: vs.VideoNode, midthr: float | list[float] | None = None,
-        lowthr: float | list[float] | None = None, highthr: float | list[float] | None = None,
+        lowval: float | list[float] | None = None, highval: float | list[float] | None = None,
         planes: PlanesT = None
     ) -> vs.VideoNode:
-        midthr, lowthr, highthr = (
+        midthr, lowval, highval = (
             thr and list(
                 scale_value(t, 32, src, chroma=i != 0)
                 for i, t in enumerate(to_arr(thr))
-            ) for thr in (midthr, lowthr, highthr)
+            ) for thr in (midthr, lowval, highval)
         )
 
-        return src.std.Binarize(midthr, lowthr, highthr, planes)
+        return src.std.Binarize(midthr, lowval, highval, planes)
 
 
 def grow_mask(
