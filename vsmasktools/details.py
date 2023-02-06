@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from vsexprtools import ExprOp
 from vsrgtools import RemoveGrainMode, RemoveGrainModeT, bilateral, gauss_blur, removegrain
-from vstools import check_variable, get_y, plane, scale_thresh, vs
+from vstools import check_variable, get_y, plane, vs
 
 from .edge import EdgeDetect, EdgeDetectT, Kirsch, MinMax, Prewitt, PrewittTCanny
 from .masks import range_mask
@@ -23,8 +23,6 @@ def detail_mask(
 ) -> vs.VideoNode:
     assert check_variable(clip, detail_mask)
 
-    brz_mm = scale_thresh(brz_mm, clip)
-    brz_ed = scale_thresh(brz_ed, clip)
 
     range_mask = minmax.edgemask(clip).std.Binarize(brz_mm)
 
@@ -44,9 +42,6 @@ def detail_mask_neo(
 ) -> vs.VideoNode:
     assert check_variable(clip, "detail_mask_neo")
 
-    detail_brz = scale_thresh(detail_brz, clip)
-    lines_brz = scale_thresh(lines_brz, clip)
-
     clip_y = get_y(clip)
     blur_pf = gauss_blur(clip_y, sigma * 0.75)
 
@@ -57,10 +52,10 @@ def detail_mask_neo(
     prew_mask = EdgeDetect.ensure_obj(edgemask).edgemask(clip_y).std.Deflate().std.Inflate()
 
     if detail_brz > 0:
-        blur_pref = blur_pref.std.Binarize(detail_brz)
+        blur_pref = Morpho.binarize(blur_pref, detail_brz)
 
     if lines_brz > 0:
-        prew_mask = prew_mask.std.Binarize(lines_brz)
+        prew_mask = Morpho.binarize(prew_mask, lines_brz)
 
     merged = ExprOp.ADD.combine(blur_pref, prew_mask)
 
@@ -70,16 +65,13 @@ def detail_mask_neo(
 def simple_detail_mask(
     clip: vs.VideoNode, sigma: float | None = None, rad: int = 3, brz_a: float = 0.025, brz_b: float = 0.045
 ) -> vs.VideoNode:
-    brz_a = scale_thresh(brz_a, clip)
-    brz_b = scale_thresh(brz_b, clip)
-
     y = plane(clip, 0)
 
     blur = gauss_blur(y, sigma) if sigma else y
 
-    mask_a = range_mask(blur, rad=rad).std.Binarize(brz_a)
+    mask_a = Morpho.binarize(range_mask(blur, rad=rad), brz_a)
 
-    mask_b = PrewittTCanny().edgemask(blur).std.Binarize(brz_b)
+    mask_b = Morpho.binarize(PrewittTCanny.edgemask(blur), brz_b)
 
     mask = ExprOp.MAX.combine(mask_a, mask_b)
 

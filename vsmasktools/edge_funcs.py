@@ -6,7 +6,7 @@ from typing import Sequence
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
-from vstools import check_variable, core, depth, get_depth, get_peak_value, get_y, iterate, plane, scale_thresh, vs
+from vstools import check_variable, core, get_peak_value, get_y, iterate, plane, scale_value, vs
 
 from .details import multi_detail_mask
 from .edge import EdgeDetect, EdgeDetectT, FDoGTCanny, Kirsch, Prewitt
@@ -35,7 +35,7 @@ def ringing_mask(
     assert check_variable(clip, ringing_mask)
 
     thmi, thma, thlimi, thlima = (
-        scale_thresh(t, clip) for t in [thmi, thma, thlimi, thlima]
+        scale_value(t, 32, clip) for t in [thmi, thma, thlimi, thlima]
     )
 
     if isinstance(credit_mask, vs.VideoNode):
@@ -48,7 +48,7 @@ def ringing_mask(
     light = norm_expr(edgemask, f'x {thlimi} - {thma - thmi} / {ExprToken.RangeMax} *')
 
     shrink = Morpho.dilation(light, rad)
-    shrink = shrink.std.Binarize(scale_thresh(brz, clip))
+    shrink = Morpho.binarize(shrink, brz)
     shrink = Morpho.erosion(shrink, 2)
     shrink = iterate(shrink, partial(core.std.Convolution, matrix=wmean_matrix), 2)
 
@@ -66,6 +66,8 @@ def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = T
     lo, hi = (peak, 0) if invert else (0, peak)
     inv_pre, inv_post = (peak, '-') if invert else ('', '')
 
+    thr_lo, thr_hi = scale_value(thr_lo, 32, clip), scale_value(thr_hi, 32, clip)
+
     return norm_expr(
         get_y(clip),
         f'x {thr_lo} < {lo} x {thr_hi} > {hi} {inv_pre} x {thr_lo} - {thr_lo} {thr_hi} - / {peak} * {inv_post} ? ?'
@@ -73,13 +75,13 @@ def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = T
 
 
 def luma_credit_mask(
-    clip: vs.VideoNode, thr: int = 230, edgemask: EdgeDetectT = FDoGTCanny, draft: bool = False
+    clip: vs.VideoNode, thr: float = 0.9, edgemask: GenericMaskT = FDoGTCanny, draft: bool = False, **kwargs: Any
 ) -> vs.VideoNode:
     clip = get_y(clip)
 
     edge_mask = EdgeDetect.ensure_obj(edgemask).edgemask(clip)
 
-    credit_mask = norm_expr([edge_mask, clip], f'y {thr} > y 0 ? x min')
+    credit_mask = norm_expr([edge_mask, y], f'y {scale_value(thr, 32, y)} > y 0 ? x min')
 
     if not draft:
         credit_mask = iterate(credit_mask, core.std.Maximum, 4)

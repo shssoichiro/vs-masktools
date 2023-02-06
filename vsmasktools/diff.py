@@ -7,7 +7,7 @@ from vskernels import Bicubic, Catrom, Kernel, KernelT
 from vsrgtools import RemoveGrainMode, bilateral, gauss_blur, removegrain
 from vstools import (
     CustomValueError, FuncExceptT, KwargsT, check_variable, depth, expect_bits, get_w, get_y, insert_clip, iterate,
-    scale_thresh, scale_value, vs
+    scale_value, vs
 )
 
 from .edge import ExLaplacian4
@@ -24,7 +24,7 @@ __all__ = [
 
 def diff_rescale(
     clip: vs.VideoNode, height: int, kernel: KernelT = Catrom,
-    thr: int | float = 55, expand: int = 2, func: FuncExceptT | None = None
+    thr: float = 0.216, expand: int = 2, func: FuncExceptT | None = None
 ) -> vs.VideoNode:
     func = func or diff_rescale
 
@@ -35,8 +35,6 @@ def diff_rescale(
     y = get_y(clip)
 
     pre, bits = expect_bits(y, 32)
-
-    thr = scale_value(thr, bits, 32, scale_offsets=True)
 
     descale = kernel.descale(pre, get_w(height), height)
     rescale = kernel.scale(descale, y.width, y.height)
@@ -52,7 +50,7 @@ def diff_rescale(
 
 
 def diff_creditless(
-    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: int | float,
+    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: float,
     start_frame: int = 0, expand: int = 2, *, prefilter: bool | int = False,
     ep_clip: vs.VideoNode | None = None, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -75,9 +73,7 @@ def diff_creditless(
         format=diff_fmt, split_planes=True
     )
 
-    thr = scale_thresh(thr, diff)
-
-    mask = ExLaplacian4().edgemask(diff).std.Binarize(thr)
+    mask = Morpho.binarize(ExLaplacian4.edgemask(diff), thr)
     mask = Morpho.expand(mask, 2 + expand, mode=XxpandMode.ELLIPSE)
 
     if not ep_clip or ep_clip.num_frames == mask.num_frames:
@@ -117,7 +113,7 @@ def diff_creditless_oped(
 
 
 def credit_mask(
-    clip: vs.VideoNode, ref: vs.VideoNode, thr: int | float,
+    clip: vs.VideoNode, ref: vs.VideoNode, thr: float,
     blur: float | None = 1.65, prefilter: bool | int = 5,
     expand: int = 8
 ) -> vs.VideoNode:
