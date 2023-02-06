@@ -147,7 +147,8 @@ class Morpho:
                     'with fast=False or no akarin plugin, you must have coords=3!', func, coords
                 )
 
-            kwargs.update(coords=[1] * 8)
+            kwargs.update(coordinates=[1] * 8)
+
         if not self._fast:
             if thr is not None:
                 kwargs.update(threshold=scale_value(thr, 32, src))
@@ -382,9 +383,9 @@ def grow_mask(
 
     assert check_variable(mask, func)
 
-    morpho = Morpho(planes)
+    morpho = Morpho(planes, func)
 
-    kwargs.update(thr=thr, coords=coords, func=func)
+    kwargs.update(thr=thr, coords=coords)
 
     closed = morpho.closing(mask, **kwargs)
     dilated = morpho.dilation(closed, **kwargs)

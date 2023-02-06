@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Sequence
 
 from vsexprtools import ExprOp, norm_expr
 from vsrgtools import box_blur
@@ -9,7 +9,6 @@ from vstools import (
     ColorRange, FrameRangeN, FrameRangesN, FramesLengthError, Position, Size, check_variable, depth, get_peak_value,
     normalize_seq, replace_ranges, vs
 )
-
 
 __all__ = [
     'GeneralMask',
@@ -47,7 +46,7 @@ class DeferredMask(GeneralMask):
         self, ranges: FrameRangeN | FrameRangesN | None = None, bound: BoundingBox | None = None,
         *, blur: bool = False, refframes: int | list[int | None] | None = None
     ) -> None:
-        self.ranges = ranges if isinstance(ranges, list) else [(0, None)] if ranges is None else [ranges]
+        self.ranges = ranges if isinstance(ranges, Sequence) else [(0, None)] if ranges is None else [ranges]
         self.blur = blur
         self.bound = bound
 

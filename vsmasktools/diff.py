@@ -14,7 +14,6 @@ from .edge import ExLaplacian4
 from .morpho import Morpho
 from .types import XxpandMode
 
-
 __all__ = [
     'diff_rescale',
     'diff_creditless',

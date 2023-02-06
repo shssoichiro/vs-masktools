@@ -51,9 +51,9 @@ class Coordinates(list[int], CustomEnum):
     @classmethod
     def from_xxpand_mode(cls, xxpand_mode: XxpandMode, iter: int = 1) -> Coordinates:
         if xxpand_mode == XxpandMode.LOSANGE or (xxpand_mode is XxpandMode.ELLIPSE and iter % 3 != 1):
-            return Coordinates.DIAMOND
+            return cls.DIAMOND
 
-        return Coordinates.RECTANGLE
+        return cls.RECTANGLE
 
 
 GenericMaskT = Union[
