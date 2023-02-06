@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import zip_longest
 from math import floor, sqrt
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, Tuple
 
 from vsexprtools import ExprList, ExprOp, ExprToken, aka_expr_available, norm_expr
 from vsrgtools.util import wmean_matrix
@@ -15,14 +15,16 @@ from vstools import (
 from .types import Coordinates, MorphoFunc, XxpandMode
 
 __all__ = [
-    'Morpho',
+    'Morpho', 'CoordsT',
     'grow_mask'
 ]
+
+CoordsT = int | Tuple[int, ConvMode] | Sequence[int]
 
 
 def _minmax_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, thr: float | None = None,
-    coords: int | tuple[int, ConvMode] | Sequence[int] | None = [1] * 8,
+    coords: CoordsT | None = [1] * 8,
     iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -31,7 +33,7 @@ def _minmax_method(  # type: ignore
 
 def _morpho_method(  # type: ignore
     self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-    coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
+    coords: CoordsT = 5, multiply: float | None = None,
     *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     ...
@@ -54,8 +56,7 @@ class Morpho:
         self._fast = fallback(self.fast, aka_expr_available) and aka_expr_available
 
     def _check_params(
-        self, radius: int, thr: float | None, coords: int | tuple[int, ConvMode] | Sequence[int],
-        planes: PlanesT, func: FuncExceptT
+        self, radius: int, thr: float | None, coords: CoordsT, planes: PlanesT, func: FuncExceptT
     ) -> tuple[FuncExceptT, PlanesT]:
         if radius < 1:
             raise CustomIndexError('radius has to be greater than 0!', func, radius)
@@ -81,8 +82,7 @@ class Morpho:
     @classmethod
     def _morpho_xx_imum(
         cls, src: vs.VideoNode, thr: float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
-        coords: int | tuple[int, ConvMode] | Sequence[int], multiply: float | None = None,
-        clamp: bool = False
+        coords: CoordsT, multiply: float | None = None, clamp: bool = False
     ) -> StrList:
         exclude = list[tuple[int, int]]()
 
@@ -124,9 +124,8 @@ class Morpho:
 
     def _mm_func(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
-        *, func: FuncExceptT, mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX],
-        **kwargs: Any
+        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT,
+        mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX], **kwargs: Any
     ) -> vs.VideoNode:
         func, planes = self._check_params(radius, thr, coords, planes, func)
 
@@ -225,8 +224,7 @@ class Morpho:
     @inject_self
     @copy_signature(_minmax_method)
     def maximum(
-        self, src: vs.VideoNode, thr: float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        self, src: vs.VideoNode, thr: float | None = None, coords: CoordsT | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
@@ -235,8 +233,7 @@ class Morpho:
     @inject_self
     @copy_signature(_minmax_method)
     def minimum(
-        self, src: vs.VideoNode, thr: float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] | None = None,
+        self, src: vs.VideoNode, thr: float | None = None, coords: CoordsT | None = None,
         iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
         *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
@@ -303,8 +300,7 @@ class Morpho:
     @inject_self
     def gradient(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
+        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
         func, planes = self._check_params(radius, thr, coords, planes, func or self.gradient)
 
@@ -337,9 +333,8 @@ class Morpho:
 
     @inject_self
     def outer_hat(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: int | float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
+        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
+        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
         func, planes = self._check_params(radius, thr, coords, planes, func or self.outer_hat)
 
@@ -357,8 +352,7 @@ class Morpho:
     @inject_self
     def inner_hat(
         self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: int | tuple[int, ConvMode] | Sequence[int] = 5, multiply: float | None = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
+        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
     ) -> vs.VideoNode:
         func, planes = self._check_params(radius, thr, coords, planes, func or self.inner_hat)
 
@@ -391,8 +385,8 @@ class Morpho:
 
 def grow_mask(
     mask: vs.VideoNode, radius: int = 1, multiply: float = 1.0,
-    planes: PlanesT = None, coords: int | tuple[int, ConvMode] | Sequence[int] = 5,
-    thr: int | float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
+    planes: PlanesT = None, coords: CoordsT = 5,
+    thr: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     func = func or grow_mask
 
