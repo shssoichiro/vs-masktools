@@ -41,7 +41,7 @@ def _morpho_method(  # type: ignore
 
 def _morpho_method2(  # type: ignore
     self: Morpho, clip: vs.VideoNode, sw: int, sh: int | None = None, mode: XxpandMode = XxpandMode.RECTANGLE,
-    thr: int | None = None, planes: PlanesT = None, *, func: FuncExceptT | None = None, **kwargs: Any
+    thr: float | None = None, planes: PlanesT = None, *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     ...
 
@@ -385,8 +385,8 @@ class Morpho:
 
 def grow_mask(
     mask: vs.VideoNode, radius: int = 1, multiply: float = 1.0,
-    planes: PlanesT = None, coords: CoordsT = 5,
-    thr: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
+    planes: PlanesT = None, coords: CoordsT = 5, thr: float | None = None,
+    *, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
     func = func or grow_mask
 

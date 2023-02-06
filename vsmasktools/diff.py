@@ -6,8 +6,7 @@ from vsexprtools import ExprOp
 from vskernels import Bicubic, Catrom, Kernel, KernelT
 from vsrgtools import RemoveGrainMode, bilateral, gauss_blur, removegrain
 from vstools import (
-    CustomValueError, FuncExceptT, KwargsT, check_variable, depth, expect_bits, get_w, get_y, insert_clip, iterate,
-    scale_value, vs
+    CustomValueError, FuncExceptT, KwargsT, check_variable, depth, expect_bits, get_w, get_y, insert_clip, iterate, vs
 )
 
 from .edge import ExLaplacian4

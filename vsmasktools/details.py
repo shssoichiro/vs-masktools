@@ -4,7 +4,7 @@ from vsexprtools import ExprOp
 from vsrgtools import RemoveGrainMode, RemoveGrainModeT, bilateral, gauss_blur, removegrain
 from vstools import check_variable, get_y, plane, vs
 
-from .edge import EdgeDetect, EdgeDetectT, Kirsch, MinMax, Prewitt, PrewittTCanny
+from .edge import Kirsch, MinMax, Prewitt, PrewittTCanny
 from .masks import range_mask
 from .morpho import Morpho
 from .types import GenericMaskT
