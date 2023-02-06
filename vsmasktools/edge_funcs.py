@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Sequence
+from typing import Any, Sequence
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import gauss_blur
@@ -9,10 +9,11 @@ from vsrgtools.util import wmean_matrix
 from vstools import check_variable, core, get_peak_value, get_y, iterate, plane, scale_value, vs
 
 from .details import multi_detail_mask
-from .edge import EdgeDetect, EdgeDetectT, FDoGTCanny, Kirsch, Prewitt
+from .edge import FDoGTCanny, Kirsch, Prewitt
 from .funcs import retinex
 from .morpho import Morpho
-from .types import Coordinates
+from .types import Coordinates, GenericMaskT
+from .utils import normalize_mask
 
 __all__ = [
     'ringing_mask',
@@ -30,7 +31,7 @@ def ringing_mask(
     rad: int = 2, brz: float = 0.35,
     thmi: float = 0.315, thma: float = 0.5,
     thlimi: float = 0.195, thlima: float = 0.392,
-    credit_mask: vs.VideoNode | EdgeDetectT = Prewitt
+    credit_mask: GenericMaskT = Prewitt, **kwargs: Any
 ) -> vs.VideoNode:
     assert check_variable(clip, ringing_mask)
 
@@ -38,12 +39,7 @@ def ringing_mask(
         scale_value(t, 32, clip) for t in [thmi, thma, thlimi, thlima]
     )
 
-    if isinstance(credit_mask, vs.VideoNode):
-        edgemask = depth(credit_mask, get_depth(clip))  # type: ignore
-    else:
-        edgemask = EdgeDetect.ensure_obj(credit_mask).edgemask(plane(clip, 0))  # type: ignore
-
-    edgemask = plane(edgemask, 0).std.Limiter()
+    edgemask = normalize_mask(credit_mask, plane(clip, 0), **kwargs).std.Limiter()
 
     light = norm_expr(edgemask, f'x {thlimi} - {thma - thmi} / {ExprToken.RangeMax} *')
 
@@ -77,15 +73,15 @@ def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = T
 def luma_credit_mask(
     clip: vs.VideoNode, thr: float = 0.9, edgemask: GenericMaskT = FDoGTCanny, draft: bool = False, **kwargs: Any
 ) -> vs.VideoNode:
-    clip = get_y(clip)
+    y = plane(clip, 0)
 
-    edge_mask = EdgeDetect.ensure_obj(edgemask).edgemask(clip)
+    edge_mask = normalize_mask(edgemask, y, **kwargs)
 
     credit_mask = norm_expr([edge_mask, y], f'y {scale_value(thr, 32, y)} > y 0 ? x min')
 
     if not draft:
-        credit_mask = iterate(credit_mask, core.std.Maximum, 4)
-        credit_mask = iterate(credit_mask, core.std.Inflate, 2)
+        credit_mask = Morpho.maximum(credit_mask, iterations=4)
+        credit_mask = Morpho.inflate(credit_mask, iterations=2)
 
     return credit_mask
 
@@ -106,12 +102,13 @@ def limited_linemask(
     clip: vs.VideoNode,
     sigmas: list[float] = [0.000125, 0.0025, 0.0055],
     detail_sigmas: list[float] = [0.011, 0.013],
-    edgemasks: Sequence[EdgeDetectT] = [Kirsch]
+    edgemasks: Sequence[GenericMaskT] = [Kirsch],
+    **kwargs: Any
 ) -> vs.VideoNode:
     clip_y = plane(clip, 0)
 
     return ExprOp.ADD(
-        (EdgeDetect.ensure_obj(edge).edgemask(clip_y) for edge in edgemasks),
+        (normalize_mask(edge, clip_y, **kwargs) for edge in edgemasks),
         (tcanny_retinex(clip_y, s) for s in sigmas),
         (multi_detail_mask(clip_y, s) for s in detail_sigmas)
     )

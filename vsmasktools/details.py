@@ -7,6 +7,8 @@ from vstools import check_variable, get_y, plane, vs
 from .edge import EdgeDetect, EdgeDetectT, Kirsch, MinMax, Prewitt, PrewittTCanny
 from .masks import range_mask
 from .morpho import Morpho
+from .types import GenericMaskT
+from .utils import normalize_mask
 
 __all__ = [
     'detail_mask',
@@ -19,14 +21,13 @@ __all__ = [
 def detail_mask(
     clip: vs.VideoNode, brz_mm: float, brz_ed: float,
     minmax: MinMax = MinMax(rady=3, radc=2),
-    edge: EdgeDetectT = Kirsch
+    edge: GenericMaskT = Kirsch
 ) -> vs.VideoNode:
     assert check_variable(clip, detail_mask)
 
+    range_mask = Morpho.binarize(minmax.edgemask(clip), brz_mm)
 
-    range_mask = minmax.edgemask(clip).std.Binarize(brz_mm)
-
-    edges = EdgeDetect.ensure_obj(edge).edgemask(clip).std.Binarize(brz_ed)
+    edges = Morpho.binarize(normalize_mask(edge, clip), brz_ed)
 
     mask = ExprOp.MAX.combine(range_mask, edges)
 
@@ -38,7 +39,7 @@ def detail_mask(
 
 def detail_mask_neo(
     clip: vs.VideoNode, sigma: float = 1.0, detail_brz: float = 0.05, lines_brz: float = 0.08,
-    edgemask: EdgeDetectT = Prewitt, rg_mode: RemoveGrainModeT = RemoveGrainMode.MINMAX_MEDIAN_OPP
+    edgemask: GenericMaskT = Prewitt, rg_mode: RemoveGrainModeT = RemoveGrainMode.MINMAX_MEDIAN_OPP
 ) -> vs.VideoNode:
     assert check_variable(clip, "detail_mask_neo")
 
@@ -49,7 +50,7 @@ def detail_mask_neo(
     blur_pref_diff = ExprOp.SUB.combine(blur_pref, clip_y).std.Deflate()
     blur_pref = Morpho.inflate(blur_pref_diff, iterations=4)
 
-    prew_mask = EdgeDetect.ensure_obj(edgemask).edgemask(clip_y).std.Deflate().std.Inflate()
+    prew_mask = normalize_mask(edgemask, clip_y).std.Deflate().std.Inflate()
 
     if detail_brz > 0:
         blur_pref = Morpho.binarize(blur_pref, detail_brz)
