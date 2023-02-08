@@ -4,14 +4,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from vsexprtools import ExprOp
+from vsexprtools import ExprOp, ExprToken, norm_expr
+from vskernels import Catrom
+from vsrgtools.util import mean_matrix
 from vstools import (
-    FileNotExistsError, FrameRangeN, FrameRangesN, VSFunction, check_variable, core, depth, fallback,
-    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_thresh, split, vs,
-    vs_object
+    CustomOverflowError, FileNotExistsError, VSFunction, check_variable, core, depth, fallback, get_neutral_value,
+    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value, split,
+    vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
+from .edge import Sobel
+from .morpho import Morpho
+from .types import GenericMaskT
+from .utils import normalize_mask
 
 __all__ = [
     'HardsubManual',
@@ -73,6 +79,8 @@ class HardsubManual(GeneralMask, vs_object):
 
 
 class HardsubMask(DeferredMask):
+    bin_thr: float = 0.75
+
     def get_progressive_dehardsub(
         self, hardsub: vs.VideoNode, ref: vs.VideoNode, partials: list[vs.VideoNode]
     ) -> tuple[list[vs.VideoNode], list[vs.VideoNode]]:
@@ -93,7 +101,7 @@ class HardsubMask(DeferredMask):
 
         assert masks[-1].format is not None
 
-        thresh = scale_thresh(0.75, masks[-1])
+        thresh = scale_value(self.bin_thr, 32, masks[-1])
 
         for p in partials:
             masks.append(
@@ -123,23 +131,32 @@ class HardsubMask(DeferredMask):
 
 
 class HardsubSignFades(HardsubMask):
-    highpass: int
+    highpass: float
     expand: int
+    edgemask: GenericMaskT
 
-    def __init__(self, *args: Any, highpass: int = 5000, expand: int = 8, **kwargs: Any) -> None:
+    def __init__(
+        self, *args: Any, highpass: float = 0.0763, expand: int = 8, edgemask: GenericMaskT = Sobel, **kwargs: Any
+    ) -> None:
         self.highpass = highpass
         self.expand = expand
+        self.edgemask = edgemask
 
         super().__init__(*args, **kwargs)
 
-    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
-        clip = core.fmtc.bitdepth(clip, bits=16).std.Convolution([1] * 9)
-        ref = core.fmtc.bitdepth(ref, bits=16).std.Convolution([1] * 9)
-        clipedge = get_y(clip).std.Sobel()
-        refedge = get_y(ref).std.Sobel()
-        mask = core.std.Expr([clipedge, refedge], f'x y - {self.highpass} < 0 65535 ?').std.Median()
-        mask = iterate(mask, core.std.Maximum, self.expand)
-        return iterate(mask, core.std.Inflate, 4)
+    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        clipedge, refedge = (
+            normalize_mask(self.edgemask, x, **kwargs).std.Convolution(mean_matrix)
+            for x in (clip, ref)
+        )
+
+        highpass = scale_value(self.highpass, 32, clip)
+
+        mask = norm_expr(
+            [clipedge, refedge], f'x y - {highpass} < 0 {ExprToken.RangeMax} ?'
+        ).std.Median()
+
+        return Morpho.inflate(Morpho.maximum(mask, iterations=self.expand), iterations=4)
 
 
 class HardsubSign(HardsubMask):
@@ -165,15 +182,16 @@ class HardsubSign(HardsubMask):
         self.inflate = inflate
         super().__init__(*args, **kwargs)
 
-    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
-        assert clip.format
+    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         hsmf = core.akarin.Expr([clip, ref], 'x y - abs')
-        hsmf = hsmf.resize.Point(format=clip.format.replace(subsampling_w=0, subsampling_h=0).id)
+        hsmf = hsmf.resize.Point(format=clip.format.replace(subsampling_w=0, subsampling_h=0).id)  # type: ignore
+
         hsmf = core.akarin.Expr(split(hsmf), "x y z max max")
-        hsmf = hsmf.std.Binarize(scale_thresh(self.thresh, hsmf))
-        hsmf = iterate(hsmf, core.std.Minimum, self.minimum)
-        hsmf = iterate(hsmf, core.std.Maximum, self.expand)
-        hsmf = iterate(hsmf, core.std.Inflate, self.inflate)
+
+        hsmf = Morpho.binarize(hsmf, self.thresh)
+        hsmf = Morpho.minimum(hsmf, iterations=self.minimum)
+        hsmf = Morpho.maximum(hsmf, iterations=self.expand)
+        hsmf = Morpho.inflate(hsmf, iterations=self.inflate)
 
         return hsmf.std.Limiter()
 
@@ -186,66 +204,56 @@ class HardsubLine(HardsubMask):
 
         super().__init__(*args, **kwargs)
 
-    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
-        clp_f = clip.format
-        assert clp_f
-        bits = clp_f.bits_per_sample
-        stype = clp_f.sample_type
+    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        assert clip.format
 
         expand_n = fallback(self.expand, clip.width // 200)
 
-        fmt_args = (clp_f.color_family, vs.INTEGER, 8, clp_f.subsampling_w, clp_f.subsampling_h)
-        yuv_fmt = core.query_video_format(*fmt_args)
+        y_range = scale_8bit(clip, 219) if clip.format.sample_type == vs.INTEGER else 1
+        uv_range = scale_8bit(clip, 224) if clip.format.sample_type == vs.INTEGER else 1
+        offset = scale_8bit(clip, 16) if clip.format.sample_type == vs.INTEGER else 0
 
-        y_range = 219 << (bits - 8) if stype == vs.INTEGER else 1
-        uv_range = 224 << (bits - 8) if stype == vs.INTEGER else 1
-        offset = 16 << (bits - 8) if stype == vs.INTEGER else 0
+        uv_abs = ' abs ' if clip.format.sample_type == vs.FLOAT else f' {get_neutral_value(clip)} - abs '
+        yexpr = f'x y - abs {y_range * 0.7} > 255 0 ?'
+        uv_thr = uv_range * 0.8
+        uvexpr = f'x {uv_abs} {uv_thr} < y {uv_abs} {uv_thr} < and 255 0 ?'
 
-        uv_abs = ' abs ' if stype == vs.FLOAT else ' {} - abs '.format((1 << bits) // 2)
-        yexpr = 'x y - abs {thr} > 255 0 ?'.format(thr=y_range * 0.7)
-        uvexpr = 'x {uv_abs} {thr} < y {uv_abs} {thr} < and 255 0 ?'.format(uv_abs=uv_abs, thr=uv_range * 0.8)
+        upper = y_range * 0.8 + offset
+        lower = y_range * 0.2 + offset
+        mindiff = y_range * 0.1
 
-        difexpr = 'x {upper} > x {lower} < or x y - abs {mindiff} > and 255 0 ?'.format(
-            upper=y_range * 0.8 + offset, lower=y_range * 0.2 + offset, mindiff=y_range * 0.1
+        difexpr = f'x {upper} > x {lower} < or x y - abs {mindiff} > and 255 0 ?'
+
+        right = core.resize.Point(clip, src_left=4)
+
+        subedge = norm_expr(
+            [clip, right], (yexpr, uvexpr), format=clip.format.replace(sample_type=vs.INTEGER, bits_per_sample=8)
         )
 
-        # right shift by 4 pixels.
-        # fmtc uses at least 16 bit internally, so it's slower for 8 bit,
-        # but its behaviour when shifting/replicating edge pixels makes it faster otherwise
-        if bits < 16:
-            right = core.resize.Point(clip, src_left=4)
-        else:
-            right = core.fmtc.resample(clip, sx=4, flt=False)
-        subedge = core.std.Expr([clip, right], [yexpr, uvexpr], yuv_fmt.id)
-        c444 = split(subedge.resize.Bicubic(format=vs.YUV444P8, filter_param_a=0, filter_param_b=0.5))
-        subedge = core.std.Expr(c444, 'x y z min min')
+        subedge = ExprOp.MIN(Catrom.resample(subedge, vs.YUV444P8), split_planes=True)
 
-        clip, ref = get_y(clip), get_y(ref)
-        ref = ref if clip.format == ref.format else depth(ref, bits)
+        clip_y, ref_y = get_y(clip), depth(get_y(ref), clip)
 
-        clips = [clip.std.Convolution([1] * 9), ref.std.Convolution([1] * 9)]
+        clips = [clip_y.std.Convolution(mean_matrix), ref_y.std.Convolution(mean_matrix)]
         diff = core.std.Expr(clips, difexpr, vs.GRAY8).std.Maximum().std.Maximum()
 
-        mask: vs.VideoNode = core.misc.Hysteresis(subedge, diff)  # type: ignore[assignment]
+        mask: vs.VideoNode = core.misc.Hysteresis(subedge, diff)
         mask = iterate(mask, core.std.Maximum, expand_n)
-        mask = mask.std.Inflate().std.Inflate().std.Convolution([1] * 9)
+        mask = mask.std.Inflate().std.Inflate().std.Convolution(mean_matrix)
 
-        return depth(mask, bits, range_in=1, range_out=1)
+        return depth(mask, clip, range_in=1, range_out=1)
 
 
 class HardsubLineFade(HardsubLine):
-    ref_float: float
-
-    def __init__(
-        self, ranges: FrameRangeN | FrameRangesN, *args: Any, refframe: float = 0.5, **kwargs: Any
-    ) -> None:
+    def __init__(self, *args: Any, refframe: float = 0.5, **kwargs: Any) -> None:
         if refframe < 0 or refframe > 1:
-            raise ValueError("HardsubLineFade: '`refframe` must be between 0 and 1!'")
-        ranges = ranges if isinstance(ranges, list) else [ranges]
-        self.ref_float = refframe
-        super().__init__(ranges, *args, refframes=None, **kwargs)
+            raise CustomOverflowError('"refframe" must be between 0 and 1!', self.__class__)
 
-    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:  # type: ignore[override]
+        self.ref_float = refframe
+
+        super().__init__(*args, refframes=None, **kwargs)
+
+    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
         self.refframes = [
             r[0] + round((r[1] - r[0]) * self.ref_float)
             for r in normalize_ranges(ref, self.ranges)
@@ -267,7 +275,7 @@ class HardsubASS(HardsubMask):
         self.shift = shift
         super().__init__(*args, **kwargs)
 
-    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
+    def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         ref = ref[0] * self.shift + ref if self.shift else ref
         mask: vs.VideoNode = ref.sub.TextFile(  # type: ignore[attr-defined]
             self.filename, fontdir=self.fontdir, blend=False
