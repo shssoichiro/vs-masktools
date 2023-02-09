@@ -6,7 +6,7 @@ from vsexprtools import ExprOp, ExprVars, aka_expr_available, norm_expr
 from vsrgtools import gauss_blur
 from vstools import (
     ColorRange, CustomRuntimeError, FuncExceptT, StrList, check_variable, get_lowest_value, get_peak_value,
-    get_sample_type, get_y, plane, vs
+    get_sample_type, get_y, plane, vs, core
 )
 
 __all__ = [
@@ -65,10 +65,11 @@ def retinex(
 
     y = get_y(clip)
 
-    if not aka_expr_available or not hasattr(vs.core, 'psm'):
+    if not aka_expr_available or not hasattr(core, 'psm'):
         if fast:
             raise CustomRuntimeError(
-                "You don't have akarin plugin, you can't use this function!", func, 'fast=True'
+                "You don't have {missing} plugin, you can't use this function!", func, 'fast=True',
+                missing=iter(x for x in ('akarin', 'psm') if not hasattr(core, x))
             )
 
         return y.retinex.MSRCP(sigma, lower_thr, upper_thr)  # type: ignore
