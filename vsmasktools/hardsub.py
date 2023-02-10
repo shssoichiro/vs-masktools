@@ -253,7 +253,7 @@ class HardsubLineFade(HardsubLine):
 
         super().__init__(*args, refframes=None, **kwargs)
 
-    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode) -> vs.VideoNode:
+    def get_mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:  # type: ignore
         self.refframes = [
             r[0] + round((r[1] - r[0]) * self.ref_float)
             for r in normalize_ranges(ref, self.ranges)
