@@ -158,7 +158,7 @@ class EdgeDetect(ABC):
         mask = self._postprocess(mask)
 
         if multi != 1:
-            mask = ExprOp.MUL(mask, suffix=multi, planes=planes)
+            mask = ExprOp.MUL(mask, suffix=str(multi), planes=planes)
 
         if lthr > 0 or hthr < peak:
             mask = norm_expr(mask, f'x {hthr} > {ExprToken.RangeMax} x {lthr} < 0 x ? ?', planes)
