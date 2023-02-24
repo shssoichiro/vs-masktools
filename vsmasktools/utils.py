@@ -110,11 +110,9 @@ def squaremask(
     if offset_x + width > clip.width or offset_y + height > clip.height:
         raise CustomValueError('mask exceeds clip size!')
 
-    base_clip = clip.std.BlankClip(
-        width, height, mask_format.id, 1, color=0 if aka_expr_available else get_peak_value(clip), keep=True
-    )
-
     if aka_expr_available:
+        base_clip = clip.std.BlankClip(None, None, mask_format.id, 1, color=0, keep=True)
+
         mask = norm_expr(
             base_clip, _get_region_expr(
                 clip, offset_x, clip.width - width - offset_x, offset_y, clip.height - height - offset_y,
@@ -122,6 +120,8 @@ def squaremask(
             ), force_akarin=func
         )
     else:
+        base_clip = clip.std.BlankClip(width, height, mask_format.id, 1, color=get_peak_value(clip), keep=True)
+
         mask = base_clip.std.AddBorders(
             offset_x, clip.width - width - offset_x, offset_y, clip.height - height - offset_y
         )
