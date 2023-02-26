@@ -70,7 +70,7 @@ class DeferredMask(GeneralMask):
             if self.blur:
                 bm = box_blur(bm, 5, 5)
 
-        if len(self.refframes) == 0:
+        if self.refframes:
             hm = ref.std.BlankClip(
                 format=ref.format.replace(color_family=vs.GRAY, subsampling_h=0, subsampling_w=0).id, keep=True
             )
