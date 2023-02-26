@@ -9,8 +9,8 @@ from vskernels import Catrom
 from vsrgtools.util import mean_matrix
 from vstools import (
     CustomOverflowError, FileNotExistsError, VSFunction, check_variable, core, depth, fallback, get_neutral_value,
-    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value, split,
-    vs, vs_object
+    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value, vs,
+    vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -101,14 +101,14 @@ class HardsubMask(DeferredMask):
 
         assert masks[-1].format is not None
 
-        thresh = scale_value(self.bin_thr, 32, masks[-1])
+        thr = scale_value(self.bin_thr, 32, masks[-1])
 
         for p in partials:
             masks.append(
                 ExprOp.SUB.combine(masks[-1], self.get_mask(p, ref))
             )
             dehardsub_masks.append(
-                iterate(core.akarin.Expr([masks[-1]], f"x {thresh} < 0 x ?"), core.std.Maximum, 4).std.Inflate()
+                iterate(core.akarin.Expr([masks[-1]], f"x {thr} < 0 x ?"), core.std.Maximum, 4).std.Inflate()
             )
             partials_dehardsubbed.append(
                 partials_dehardsubbed[-1].std.MaskedMerge(p, dehardsub_masks[-1])
@@ -163,32 +163,32 @@ class HardsubSign(HardsubMask):
     """
     Hardsub scenefiltering helper using `Zastin <https://github.com/kgrabs>`_'s hardsub mask.
 
-    :param thresh:  Binarization threshold, [0, 1] (Default: 0.06).
+    :param thr:     Binarization threshold, [0, 1] (Default: 0.06).
     :param expand:  std.Maximum iterations (Default: 8).
     :param inflate: std.Inflate iterations (Default: 7).
     """
 
-    thresh: float
+    thr: float
     minimum: int
     expand: int
     inflate: int
 
     def __init__(
-        self, *args: Any, thresh: float = 0.06, minimum: int = 1, expand: int = 8, inflate: int = 7, **kwargs: Any
+        self, *args: Any, thr: float = 0.06, minimum: int = 1, expand: int = 8, inflate: int = 7, **kwargs: Any
     ) -> None:
-        self.thresh = thresh
+        self.thr = thr
         self.minimum = minimum
         self.expand = expand
         self.inflate = inflate
         super().__init__(*args, **kwargs)
 
     def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        hsmf = core.akarin.Expr([clip, ref], 'x y - abs')
+        hsmf = norm_expr([clip, ref], 'x y - abs')
         hsmf = hsmf.resize.Point(format=clip.format.replace(subsampling_w=0, subsampling_h=0).id)  # type: ignore
 
-        hsmf = core.akarin.Expr(split(hsmf), "x y z max max")
+        hsmf = ExprOp.MAX(hsmf, split_planes=True)
 
-        hsmf = Morpho.binarize(hsmf, self.thresh)
+        hsmf = Morpho.binarize(hsmf, self.thr)
         hsmf = Morpho.minimum(hsmf, iterations=self.minimum)
         hsmf = Morpho.maximum(hsmf, iterations=self.expand)
         hsmf = Morpho.inflate(hsmf, iterations=self.inflate)
