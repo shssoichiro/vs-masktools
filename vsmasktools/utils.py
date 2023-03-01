@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any, Callable, Concatenate, Iterable
 
 from vsexprtools import ExprOp, aka_expr_available, norm_expr
 from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
-    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, check_variable, check_variable_format, flatten,
-    get_peak_value, insert_clip, replace_ranges, split, vs, depth
+    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, P, check_ref_clip, check_variable, check_variable_format,
+    core, depth, flatten, get_peak_value, insert_clip, replace_ranges, split, vs
 )
 
+from .abstract import GeneralMask
 from .edge import EdgeDetect, RidgeDetect
 from .types import GenericMaskT
-from .abstract import GeneralMask
 
 __all__ = [
     'max_planes',
@@ -21,7 +21,9 @@ __all__ = [
 
     'squaremask', 'replace_squaremask', 'freeze_replace_squaremask',
 
-    'normalize_mask'
+    'normalize_mask',
+
+    'rekt_partial'
 ]
 
 
@@ -224,3 +226,58 @@ def normalize_mask(
         mask = mask(clip, ref)
 
     return depth(mask, clip)
+
+
+def rekt_partial(
+    clip: vs.VideoNode, left: int = 0, top: int = 0, right: int = 0, bottom: int = 0,
+    func: Callable[Concatenate[vs.VideoNode, P], vs.VideoNode] = lambda clip, *args, **kwargs: clip,
+    *args: P.args, **kwargs: P.kwargs
+) -> vs.VideoNode:
+    assert check_variable(clip, rekt_partial)
+
+    if left == top == right == bottom == 0:
+        return func(clip, *args, **kwargs)
+
+    cropped = clip.std.Crop(left, right, top, bottom)
+
+    filtered = func(cropped, *args, **kwargs)
+
+    check_ref_clip(cropped, filtered, rekt_partial)
+
+    if aka_expr_available:
+        filtered = filtered.std.AddBorders(left, right, top, bottom)
+
+        ratio_w, ratio_h = 1 << clip.format.subsampling_w, 1 << clip.format.subsampling_h
+
+        vals = list(filter(None, [
+            ('X {left} > ' if left else None),
+            ('X {right} < ' if right else None),
+            ('Y {top} > ' if top else None),
+            ('Y {bottom} < ' if bottom else None)
+        ]))
+
+        return norm_expr(
+            [clip, filtered], [*vals, ['and'] * (len(vals) - 1), 'y x ?'],
+            left=[left, left / ratio_w], right=[clip.width - right, (clip.width - right) / ratio_w],
+            top=[top, top / ratio_h], bottom=[clip.height - bottom, (clip.height - bottom) / ratio_h]
+        )
+
+    if not (top or bottom) and (right or left):
+        return core.std.StackHorizontal(list(filter(None, [
+            clip.std.CropAbs(left, clip.height) if left else None,
+            filtered,
+            clip.std.CropAbs(right, clip.height, x=clip.width - right) if right else None,
+        ])))
+
+    if (top or bottom) and (right or left):
+        filtered = core.std.StackHorizontal(list(filter(None, [
+            clip.std.CropAbs(left, filtered.height, y=top) if left else None,
+            filtered,
+            clip.std.CropAbs(right, filtered.height, x=clip.width - right, y=top) if right else None,
+        ])))
+
+    return core.std.StackVertical(list(filter(None, [
+        clip.std.CropAbs(clip.width, top) if top else None,
+        filtered,
+        clip.std.CropAbs(clip.width, bottom, y=clip.height - bottom) if bottom else None,
+    ])))
