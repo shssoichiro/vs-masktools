@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Sequence, overload
 
 from vsexprtools import ExprOp, ExprVars, aka_expr_available, norm_expr
 from vsrgtools import gauss_blur
 from vstools import (
-    ColorRange, CustomRuntimeError, FuncExceptT, StrList, check_variable, get_lowest_value, get_peak_value,
-    get_sample_type, get_y, plane, vs, core
+    ColorRange, CustomRuntimeError, FuncExceptT, StrList, check_variable, core, get_lowest_value, get_peak_value,
+    get_sample_type, get_y, plane, vs
 )
 
 __all__ = [
@@ -15,9 +15,24 @@ __all__ = [
 ]
 
 
-def adg_mask(
+@overload
+def adg_mask(  # type: ignore
     clip: vs.VideoNode, luma_scaling: float = 8.0, relative: bool = False, func: FuncExceptT | None = None
 ) -> vs.VideoNode:
+    ...
+
+
+@overload
+def adg_mask(
+    clip: vs.VideoNode, luma_scaling: Sequence[float] = ..., relative: bool = False, func: FuncExceptT | None = None
+) -> list[vs.VideoNode]:
+    ...
+
+
+def adg_mask(
+    clip: vs.VideoNode, luma_scaling: float | Sequence[float] = 8.0,
+    relative: bool = False, func: FuncExceptT | None = None
+) -> vs.VideoNode | list[vs.VideoNode]:
     func = func or adg_mask
 
     assert check_variable(clip, func)
@@ -29,6 +44,9 @@ def adg_mask(
             raise CustomRuntimeError(
                 "You don't have akarin plugin, you can't use this function!", func, 'relative=True'
             )
+
+        if isinstance(luma_scaling, Sequence):
+            return [y.adg.Mask(ls) for ls in luma_scaling]  # type: ignore
 
         return y.adg.Mask(luma_scaling)  # type: ignore
 
@@ -45,11 +63,17 @@ def adg_mask(
 
     x_string += '0 0.999 clamp X!'
 
-    return norm_expr(
-        y, f'{x_string} 1 X@ X@ X@ X@ X@ '
-        '18.188 * 45.47 - * 36.624 + * 9.466 - * 1.124 + * - '
-        f'x.PAverage 2 pow {luma_scaling} * pow {aft_int}'
-    )
+    def _adgfunc(ls: float) -> vs.VideoNode:
+        return norm_expr(
+            y, f'{x_string} 1 X@ X@ X@ X@ X@ '
+            '18.188 * 45.47 - * 36.624 + * 9.466 - * 1.124 + * - '
+            f'x.PAverage 2 pow {ls} * pow {aft_int}'
+        )
+
+    if isinstance(luma_scaling, Sequence):
+        return [_adgfunc(ls) for ls in luma_scaling]
+
+    return _adgfunc(luma_scaling)
 
 
 def retinex(
