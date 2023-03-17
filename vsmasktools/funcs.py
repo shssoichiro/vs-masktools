@@ -55,7 +55,7 @@ def adg_mask(
 def retinex(
     clip: vs.VideoNode, sigma: Sequence[float] = [25, 80, 250],
     lower_thr: float = 0.001, upper_thr: float = 0.001,
-    fast: bool = False, func: FuncExceptT | None = None
+    fast: bool | None = None, func: FuncExceptT | None = None
 ) -> vs.VideoNode:
     func = func or retinex
 
@@ -73,6 +73,8 @@ def retinex(
             )
 
         return y.retinex.MSRCP(sigma, lower_thr, upper_thr)  # type: ignore
+    elif fast is None:
+        fast = True
 
     y = y.std.PlaneStats()
     is_float = get_sample_type(y) is vs.FLOAT
