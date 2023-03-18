@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Concatenate, Iterable
 
-from vsexprtools import ExprOp, aka_expr_available, norm_expr
+from vsexprtools import ExprOp, complexpr_available, norm_expr
 from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
@@ -57,7 +57,7 @@ def _get_region_expr(
 
 
 def region_rel_mask(clip: vs.VideoNode, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0) -> vs.VideoNode:
-    if aka_expr_available:
+    if complexpr_available:
         return norm_expr(clip, _get_region_expr(clip, left, right, top, bottom, 0), force_akarin=region_rel_mask)
 
     return clip.std.Crop(left, right, top, bottom).std.AddBorders(left, right, top, bottom)
@@ -70,7 +70,7 @@ def region_abs_mask(clip: vs.VideoNode, width: int, height: int, left: int = 0, 
         )
 
     if 0 in {clip.width, clip.height}:
-        if aka_expr_available:
+        if complexpr_available:
             return norm_expr(
                 clip, _get_region_expr(clip, left, left + width, top, top + height, 0, True),
                 force_akarin=region_rel_mask
@@ -112,7 +112,7 @@ def squaremask(
     if offset_x + width > clip.width or offset_y + height > clip.height:
         raise CustomValueError('mask exceeds clip size!')
 
-    if aka_expr_available:
+    if complexpr_available:
         base_clip = clip.std.BlankClip(None, None, mask_format.id, 1, color=0, keep=True)
 
         mask = norm_expr(
@@ -244,7 +244,7 @@ def rekt_partial(
 
     check_ref_clip(cropped, filtered, rekt_partial)
 
-    if aka_expr_available:
+    if complexpr_available:
         filtered = filtered.std.AddBorders(left, right, top, bottom)
 
         ratio_w, ratio_h = 1 << clip.format.subsampling_w, 1 << clip.format.subsampling_h

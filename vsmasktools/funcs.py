@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence, overload
 
-from vsexprtools import ExprOp, ExprVars, aka_expr_available, norm_expr
+from vsexprtools import ExprOp, ExprVars, complexpr_available, norm_expr
 from vsrgtools import gauss_blur
 from vstools import (
     ColorRange, CustomRuntimeError, FuncExceptT, StrList, check_variable, core, get_lowest_value, get_peak_value,
@@ -39,7 +39,7 @@ def adg_mask(
 
     y = plane(clip, 0).std.PlaneStats(prop='P')
 
-    if not aka_expr_available:
+    if not complexpr_available:
         if relative:
             raise CustomRuntimeError(
                 "You don't have akarin plugin, you can't use this function!", func, 'relative=True'
@@ -89,7 +89,7 @@ def retinex(
 
     y = get_y(clip)
 
-    if not aka_expr_available or not hasattr(core, 'psm'):
+    if not complexpr_available or not hasattr(core, 'psm'):
         if fast:
             raise CustomRuntimeError(
                 "You don't have {missing} plugin, you can't use this function!", func, 'fast=True',

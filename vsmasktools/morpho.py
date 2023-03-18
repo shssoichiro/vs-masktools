@@ -5,7 +5,7 @@ from itertools import zip_longest
 from math import floor, sqrt
 from typing import Any, Literal, Sequence, Tuple
 
-from vsexprtools import ExprList, ExprOp, ExprToken, aka_expr_available, norm_expr
+from vsexprtools import ExprList, ExprOp, ExprToken, complexpr_available, norm_expr
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
@@ -53,7 +53,7 @@ class Morpho:
     fast: bool | None = None
 
     def __post_init__(self) -> None:
-        self._fast = fallback(self.fast, aka_expr_available) and aka_expr_available
+        self._fast = fallback(self.fast, complexpr_available) and complexpr_available
 
     def _check_params(
         self, radius: int, thr: float | None, coords: CoordsT, planes: PlanesT, func: FuncExceptT
