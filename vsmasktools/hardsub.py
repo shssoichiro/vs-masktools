@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from vsexprtools import ExprOp, ExprToken, norm_expr
+from vsexprtools import ExprOp, ExprToken, expr_func, norm_expr
 from vskernels import Catrom
 from vsrgtools.util import mean_matrix
 from vstools import (
@@ -108,7 +108,7 @@ class HardsubMask(DeferredMask):
                 ExprOp.SUB.combine(masks[-1], self.get_mask(p, ref))
             )
             dehardsub_masks.append(
-                iterate(core.akarin.Expr([masks[-1]], f"x {thr} < 0 x ?"), core.std.Maximum, 4).std.Inflate()
+                iterate(expr_func([masks[-1]], f"x {thr} < 0 x ?"), core.std.Maximum, 4).std.Inflate()
             )
             partials_dehardsubbed.append(
                 partials_dehardsubbed[-1].std.MaskedMerge(p, dehardsub_masks[-1])
