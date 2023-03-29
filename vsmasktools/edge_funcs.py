@@ -10,7 +10,7 @@ from vstools import check_variable, core, get_peak_value, get_y, iterate, plane,
 
 from .details import multi_detail_mask
 from .edge import FDoGTCanny, Kirsch, Prewitt
-from .funcs import retinex
+from .spat_funcs import retinex
 from .morpho import Morpho
 from .types import Coordinates, GenericMaskT
 from .utils import normalize_mask
