@@ -123,8 +123,6 @@ class BaseDetect:
 class EdgeDetect(ABC):
     """Abstract edge detection interface."""
 
-    _bits: int
-
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
 
@@ -174,7 +172,6 @@ class EdgeDetect(ABC):
 
         kwargs = self.kwargs | kwargs
 
-        self._bits = clip.format.bits_per_sample
         peak = get_peak_value(clip)
         hthr = peak if hthr is None else hthr
 
@@ -194,7 +191,7 @@ class EdgeDetect(ABC):
         except Exception as e:
             raise CustomRuntimeError('There was an error processing the mask! Are you using an abstract class?') from e
 
-        mask = self._postprocess(mask)
+        mask = self._postprocess(mask, clip.format.bits_per_sample)
 
         if multi != 1:
             mask = ExprOp.MUL(mask, suffix=str(multi), planes=planes)
@@ -230,7 +227,7 @@ class EdgeDetect(ABC):
     def _preprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
         return clip
 
-    def _postprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _postprocess(self, clip: vs.VideoNode, input_bits: int) -> vs.VideoNode:
         return clip
 
 
@@ -276,7 +273,7 @@ class MatrixEdgeDetect(EdgeDetect):
     def _get_mode_types(self) -> Sequence[str]:
         return self.mode_types if self.mode_types else ['s'] * len(self._get_matrices())
 
-    def _postprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
+    def _postprocess(self, clip: vs.VideoNode, input_bits: int) -> vs.VideoNode:
         if len(self.matrices[0]) > 9 or (self.mode_types and self.mode_types[0] != 's'):
             clip = clip.std.Crop(
                 right=clip.format.subsampling_w * 2 if clip.format and clip.format.subsampling_w != 0 else 2

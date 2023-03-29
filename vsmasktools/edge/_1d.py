@@ -149,8 +149,8 @@ class SavitzkyGolayNormalise(SavitzkyGolay):
     def _preprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
         return depth(clip, 32)
 
-    def _postprocess(self, clip: vs.VideoNode) -> vs.VideoNode:
-        return depth(clip, self._bits, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
+    def _postprocess(self, clip: vs.VideoNode, input_bits: int) -> vs.VideoNode:
+        return depth(clip, input_bits, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
 
     def _get_matrices(self) -> Sequence[Sequence[float]]:
         assert self.divisors
