@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum, auto
+from enum import Enum, IntFlag, auto
 from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
@@ -16,9 +16,11 @@ __all__ = [
     'EdgeDetect', 'EdgeDetectT',
     'RidgeDetect', 'RidgeDetectT',
 
-    'MatrixEdgeDetect', 'SingleMatrix', 'EuclidianDistance',
+    'MatrixEdgeDetect', 'SingleMatrix', 'EuclidianDistance', 'MagnitudeMatrix',
 
     'Max',
+
+    'MagDirection',
 
     'get_all_edge_detects',
     'get_all_ridge_detect',
@@ -28,6 +30,36 @@ __all__ = [
 class _Feature(Enum):
     EDGE = auto()
     RIDGE = auto()
+
+
+class MagDirection(IntFlag):
+    """Direction of magnitude calculation."""
+
+    N = auto()
+    NW = auto()
+    W = auto()
+    SW = auto()
+    S = auto()
+    SE = auto()
+    E = auto()
+    NE = auto()
+
+    ALL = N | NW | W | SW | S | SE | E | NE
+
+    AXIS = N | W | S | E
+    CORNERS = NW | SW | SE | NE
+
+    NORTH = N | NW | NE
+    WEAST = W | NW | SW
+    EAST = E | NE | SE
+    SOUTH = S | SW | SE
+
+    def select_matrices(self, matrices: Sequence[T]) -> Sequence[T]:
+        assert len(matrices) == len(MagDirection) and self
+
+        return [
+            matrix for flag, matrix in zip(MagDirection, matrices) if self & flag
+        ]
 
 
 class BaseDetect:
@@ -250,6 +282,16 @@ class MatrixEdgeDetect(EdgeDetect):
                 right=clip.format.subsampling_w * 2 if clip.format and clip.format.subsampling_w != 0 else 2
             ).resize.Point(clip.width, src_width=clip.width)
         return clip
+
+
+class MagnitudeMatrix(MatrixEdgeDetect):
+    def __init__(self, mag_directions: MagDirection = MagDirection.ALL, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
+        self.mag_directions = mag_directions
+
+    def _get_matrices(self) -> Sequence[Sequence[float]]:
+        return self.mag_directions.select_matrices(self.matrices)
 
 
 class RidgeDetect(MatrixEdgeDetect):
