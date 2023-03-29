@@ -93,6 +93,11 @@ class EdgeDetect(ABC):
 
     _bits: int
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__()
+
+        self.kwargs = kwargs
+
     @classmethod
     def from_param(
         cls: type[EdgeDetect], edge_detect: EdgeDetectT | None = None, func_except: FuncExceptT | None = None
@@ -134,6 +139,8 @@ class EdgeDetect(ABC):
         feature: _Feature = _Feature.EDGE, planes: PlanesT = None, **kwargs: Any
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
+
+        kwargs = self.kwargs | kwargs
 
         self._bits = clip.format.bits_per_sample
         peak = get_peak_value(clip)
