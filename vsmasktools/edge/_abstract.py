@@ -7,7 +7,7 @@ from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vstools import (
     ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, PlanesT, T, check_variable, core, get_lowest_values,
-    get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane, vs
+    get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane, scale_value, vs
 )
 
 from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
@@ -173,7 +173,9 @@ class EdgeDetect(ABC):
         kwargs = self.kwargs | kwargs
 
         peak = get_peak_value(clip)
-        hthr = peak if hthr is None else hthr
+        hthr = 1.0 if hthr is None else hthr
+
+        lthr, hthr = scale_value(lthr, 32, clip), scale_value(hthr, 32, clip)
 
         planes = normalize_planes(clip, planes)
 
