@@ -12,7 +12,7 @@ from vstools import ColorRange, KwargsT, depth, get_depth, join, split, vs
 
 from ..morpho import Morpho
 from ..types import XxpandMode
-from ._abstract import EdgeDetect, EuclidianDistance, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
+from ._abstract import EdgeDetect, EuclidianDistance, MagnitudeMatrix, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
 
 __all__ = [
     'Matrix3x3',
@@ -297,18 +297,18 @@ class TheToof(Max, Matrix3x3):
     divisors = [4] * 4
 
 
-class Kirsch(Max, Matrix3x3):
+class Kirsch(MagnitudeMatrix, Max, Matrix3x3):
     """Russell Kirsch compass operator."""
 
     matrices = [
-        [5, 5, 5, -3, 0, -3, -3, -3, -3],
-        [5, 5, -3, 5, 0, -3, -3, -3, -3],
-        [5, -3, -3, 5, 0, -3, 5, -3, -3],
-        [-3, -3, -3, 5, 0, -3, 5, 5, -3],
-        [-3, -3, -3, -3, 0, -3, 5, 5, 5],
-        [-3, -3, -3, -3, 0, 5, -3, 5, 5],
-        [-3, -3, 5, -3, 0, 5, -3, -3, 5],
-        [-3, 5, 5, -3, 0, 5, -3, -3, -3]
+        [5, 5, 5, -3, 0, -3, -3, -3, -3],  # N
+        [5, 5, -3, 5, 0, -3, -3, -3, -3],  # NW
+        [5, -3, -3, 5, 0, -3, 5, -3, -3],  # W
+        [-3, -3, -3, 5, 0, -3, 5, 5, -3],  # SW
+        [-3, -3, -3, -3, 0, -3, 5, 5, 5],  # S
+        [-3, -3, -3, -3, 0, 5, -3, 5, 5],  # SE
+        [-3, -3, 5, -3, 0, 5, -3, -3, 5],  # E
+        [-3, 5, 5, -3, 0, 5, -3, -3, -3],  # NE
     ]
 
 
