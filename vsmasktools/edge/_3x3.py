@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, NoReturn, Sequence
 
 from vsexprtools import ExprOp
-from vstools import ColorRange, depth, get_depth, join, split, vs
+from vstools import ColorRange, KwargsT, depth, get_depth, join, split, vs
 
 from ..morpho import Morpho
 from ..types import XxpandMode
@@ -90,7 +90,7 @@ class TriticalTCanny(Matrix3x3, EdgeDetect):
     """
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=0, **kwargs)
+        return clip.tcanny.TCanny(op=0, **(KwargsT(sigma=0, mode=1) | kwargs))
 
 
 class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -125,7 +125,7 @@ class PrewittTCanny(Matrix3x3, EdgeDetect):
     """Judith M. S. Prewitt TCanny plugin operator."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=1, scale=2, **kwargs)
+        return clip.tcanny.TCanny(op=1, **(KwargsT(sigma=0, mode=1, scale=2) | kwargs))
 
 
 class Sobel(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -148,7 +148,7 @@ class SobelTCanny(Matrix3x3, EdgeDetect):
     """Sobel–Feldman Vapoursynth plugin operator."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=2, scale=2, **kwargs)
+        return clip.tcanny.TCanny(op=2, **(KwargsT(sigma=0, mode=1, scale=2) | kwargs))
 
 
 class ASobel(Matrix3x3, EdgeDetect):
@@ -190,7 +190,7 @@ class ScharrTCanny(Matrix3x3, EdgeDetect):
     """H. Scharr optimised TCanny Vapoursynth plugin operator."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=2, scale=4 / 3, **kwargs)
+        return clip.tcanny.TCanny(op=2, **(KwargsT(sigma=0, mode=1, scale=4 / 3) | kwargs))  # type: ignore
 
 
 class Kroon(RidgeDetect, EuclidianDistance, Matrix3x3):
@@ -207,7 +207,7 @@ class KroonTCanny(Matrix3x3, EdgeDetect):
     """Dirk-Jan Kroon TCanny Vapoursynth plugin operator."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=4, scale=1 / 17, **kwargs)
+        return clip.tcanny.TCanny(op=4, **(KwargsT(mode=1, scale=1 / 17) | kwargs))  # type: ignore
 
 
 class FreyChen(MatrixEdgeDetect):
@@ -316,7 +316,7 @@ class KirschTCanny(Matrix3x3, EdgeDetect):
     """Russell Kirsch compass TCanny Vapoursynth plugin operator."""
 
     def _compute_edge_mask(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=5, **kwargs)
+        return clip.tcanny.TCanny(op=5, **(KwargsT(sigma=0, mode=1) | kwargs))
 
 
 # Misc
