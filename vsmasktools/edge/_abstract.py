@@ -196,7 +196,9 @@ class EdgeDetect(ABC):
         if multi != 1:
             mask = ExprOp.MUL(mask, suffix=str(multi), planes=planes)
 
-        if lthr > 0 and hthr < peak:
+        if lthr == hthr:
+            mask = norm_expr(mask, f'x {hthr} >= {ExprToken.RangeMax} 0 ?', planes)
+        elif lthr > 0 and hthr < peak:
             mask = norm_expr(mask, f'x {hthr} > {ExprToken.RangeMax} x {lthr} < 0 x ? ?', planes)
         elif lthr > 0:
             mask = norm_expr(mask, f'x {lthr} < 0 x ?', planes)
