@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence, overload
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
-from vstools import check_variable, core, get_peak_value, get_y, iterate, plane, scale_value, vs
+from vstools import CustomIntEnum, check_variable, core, depth, get_peak_value, get_y, iterate, plane, scale_value, vs
 
 from .details import multi_detail_mask
-from .edge import FDoGTCanny, Kirsch, Prewitt
-from .spat_funcs import retinex
+from .edge import FDoGTCanny, Kirsch, MagDirection, Prewitt, PrewittTCanny
 from .morpho import Morpho
+from .spat_funcs import retinex
 from .types import Coordinates, GenericMaskT
 from .utils import normalize_mask
 
@@ -22,7 +22,9 @@ __all__ = [
 
     'tcanny_retinex',
 
-    'limited_linemask'
+    'limited_linemask',
+
+    'dre_edgemask'
 ]
 
 
@@ -112,3 +114,52 @@ def limited_linemask(
         (tcanny_retinex(clip_y, s) for s in sigmas),
         (multi_detail_mask(clip_y, s) for s in detail_sigmas)
     )
+
+
+class _dre_edgemask(CustomIntEnum):
+    """Edgemask with dynamic range enhancement prefiltering."""
+
+    RETINEX = 0
+    CLAHE = 1
+
+    def _prefilter(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
+        if self is self.RETINEX:
+            sigmas = kwargs.get('sigmas', [50, 200, 350])
+
+            return retinex(clip, sigmas, 0.001, 0.005)
+
+        if self is self.CLAHE:
+            limit, tile = kwargs.get('limit', 0.3), kwargs.get('tile', 5)
+
+            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit / 10, 32, 16), tile), clip)
+
+        return clip
+
+    @overload
+    def __call__(  # type: ignore
+        self: Literal[RETINEX], src: vs.VideoNode, tsigma: float = 1, brz: float = 0.122,
+        *, sigmas: Sequence[float] = [50, 200, 350]
+    ) -> vs.VideoNode:
+        ...
+
+    @overload
+    def __call__(  # type: ignore
+        self: Literal[CLAHE], src: vs.VideoNode, tsigma: float = 1, brz: float = 0.122,
+        *, limit: float = 0.3, tile: int = 5
+    ) -> vs.VideoNode:
+        ...
+
+    def __call__(self, src: vs.VideoNode, tsigma: float = 1, brz: float = 0.122, **kwargs: Any) -> vs.VideoNode:
+        luma = get_y(src)
+
+        dreluma = self._prefilter(luma, **kwargs)
+
+        tcanny = PrewittTCanny.edgemask(dreluma, sigma=tsigma, scale=1)
+        tcanny = Morpho.minimum(tcanny, coords=Coordinates.CORNERS)
+
+        kirsch = Kirsch(MagDirection.N | MagDirection.EAST).edgemask(luma)
+
+        return Morpho.binarize(ExprOp.MAX(tcanny, kirsch), brz)
+
+
+dre_edgemask = _dre_edgemask.RETINEX
