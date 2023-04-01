@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Literal, Sequence, overload
+from typing import Any, Literal, Sequence, cast, overload
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
-from vstools import CustomIntEnum, check_variable, core, depth, get_peak_value, get_y, iterate, plane, scale_value, vs
+from vstools import (
+    CustomEnum, VSFunctionAllArgs, check_variable, core, depth, get_peak_value, get_y, iterate, plane, scale_value, vs
+)
 
 from .details import multi_detail_mask
 from .edge import FDoGTCanny, Kirsch, MagDirection, Prewitt, PrewittTCanny
@@ -116,19 +118,19 @@ def limited_linemask(
     )
 
 
-class _dre_edgemask(CustomIntEnum):
+class _dre_edgemask(CustomEnum):
     """Edgemask with dynamic range enhancement prefiltering."""
 
-    RETINEX = 0
-    CLAHE = 1
+    RETINEX = cast(VSFunctionAllArgs, object())
+    CLAHE = cast(VSFunctionAllArgs, object())
 
     def _prefilter(self, clip: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
-        if self is self.RETINEX:
+        if self is self.RETINEX:  # type: ignore
             sigmas = kwargs.get('sigmas', [50, 200, 350])
 
             return retinex(clip, sigmas, 0.001, 0.005)
 
-        if self is self.CLAHE:
+        if self is self.CLAHE:  # type: ignore
             limit, tile = kwargs.get('limit', 0.3), kwargs.get('tile', 5)
 
             return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit / 10, 32, 16), tile), clip)
