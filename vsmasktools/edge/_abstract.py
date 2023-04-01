@@ -143,8 +143,8 @@ class EdgeDetect(ABC):
     @inject_self
     def edgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, planes: PlanesT = None,
-        **kwargs: Any
+        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
+        planes: PlanesT | tuple[PlanesT, bool] = None, **kwargs: Any
     ) -> vs.VideoNode:
         """
         Makes edge mask based on convolution kernel.
@@ -166,7 +166,7 @@ class EdgeDetect(ABC):
         lthr: float = 0.0, hthr: float | None = None,
         multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
-        feature: _Feature = _Feature.EDGE, planes: PlanesT = None, **kwargs: Any
+        feature: _Feature = _Feature.EDGE, planes: PlanesT | tuple[PlanesT, bool] = None, **kwargs: Any
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
 
@@ -177,7 +177,11 @@ class EdgeDetect(ABC):
 
         lthr, hthr = scale_value(lthr, 32, clip), scale_value(hthr, 32, clip)
 
-        planes = normalize_planes(clip, planes)
+        discard_planes = False
+        if isinstance(planes, tuple):
+            planes, discard_planes = planes
+
+        planes = normalize_planes(clip, planes)  # type: ignore
 
         wclip = plane(clip, planes[0]) if len(planes) == 1 else clip
 
@@ -219,7 +223,7 @@ class EdgeDetect(ABC):
 
         assert mask.format
 
-        if mask.format.num_planes != clip.format.num_planes:
+        if mask.format.num_planes != clip.format.num_planes and not discard_planes:
             return join({None: clip.std.BlankClip(color=[0] * clip.format.num_planes, keep=True), planes[0]: mask})
 
         return mask
@@ -311,7 +315,8 @@ class RidgeDetect(MatrixEdgeDetect):
     @inject_self
     def ridgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
-        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False, **kwargs: Any
+        clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
+        planes: PlanesT | tuple[PlanesT, bool] = None, **kwargs: Any
     ) -> vs.VideoNode | NoReturn:
         """
         Makes ridge mask based on convolution kernel.
@@ -325,7 +330,7 @@ class RidgeDetect(MatrixEdgeDetect):
 
         :return:                Mask clip
         """
-        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.RIDGE, **kwargs)
+        return self._mask(clip, lthr, hthr, multi, clamp, _Feature.RIDGE, planes, **kwargs)
 
     def _merge_ridge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
         return core.std.Expr(clips, 'x y * 2 * -1 * x dup * z dup * 4 * + y dup * + + sqrt x y + +')
