@@ -159,7 +159,12 @@ class _dre_edgemask(CustomIntEnum):
 
         kirsch = Kirsch(MagDirection.N | MagDirection.EAST).edgemask(luma)
 
-        return Morpho.binarize(ExprOp.MAX(tcanny, kirsch), brz)
+        maxclip = ExprOp.MAX(tcanny, kirsch)
+
+        if brz > 0:
+            return Morpho.binarize(maxclip, brz)
+
+        return maxclip
 
 
 dre_edgemask = _dre_edgemask.RETINEX
