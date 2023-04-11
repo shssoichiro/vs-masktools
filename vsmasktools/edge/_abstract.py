@@ -55,7 +55,7 @@ class MagDirection(IntFlag):
     SOUTH = S | SW | SE
 
     def select_matrices(self, matrices: Sequence[T]) -> Sequence[T]:
-        assert len(matrices) == len(MagDirection) and self
+        assert len(matrices) == 8 and self
 
         return [
             matrix for flag, matrix in zip(MagDirection, matrices) if self & flag
