@@ -139,7 +139,7 @@ def retinex(
     )
 
 
-def flat_mask(src: vs.VideoNode, radius: int = 5, thr: int = 0.11, gauss: bool = False) -> vs.VideoNode:
+def flat_mask(src: vs.VideoNode, radius: int = 5, thr: float = 0.11, gauss: bool = False) -> vs.VideoNode:
     luma = get_y(src)
 
     blur = gauss_blur(luma, radius * 0.361083333) if gauss else box_blur(luma, radius)
