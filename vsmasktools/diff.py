@@ -49,7 +49,7 @@ def diff_rescale(
 
 
 def diff_creditless(
-    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: float,
+    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: float = 0.1,
     start_frame: int = 0, expand: int = 2, *, prefilter: bool | int = False,
     ep_clip: vs.VideoNode | None = None, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -72,7 +72,7 @@ def diff_creditless(
         format=diff_fmt, split_planes=True
     )
 
-    mask = Morpho.binarize(ExLaplacian4.edgemask(diff), thr)
+    mask = Morpho.binarize(ExLaplacian4.edgemask(diff), thr / 10)
     mask = Morpho.expand(mask, 2 + expand, mode=XxpandMode.ELLIPSE)
 
     if not ep_clip or ep_clip.num_frames == mask.num_frames:
@@ -84,7 +84,7 @@ def diff_creditless(
 
 
 def diff_creditless_oped(
-    ep: vs.VideoNode, ncop: vs.VideoNode, nced: vs.VideoNode,
+    ep: vs.VideoNode, ncop: vs.VideoNode, nced: vs.VideoNode, thr: float = 0.1,
     opstart: int | None = None, opend: int | None = None,
     edstart: int | None = None, edend: int | None = None,
     func: FuncExceptT | None = None, **kwargs: Any
@@ -93,13 +93,13 @@ def diff_creditless_oped(
 
     op_mask = ed_mask = None
 
-    kwargs |= KwargsT(thr=25, expand=4, prefilter=False, func=func, ep_clip=ep) | kwargs
+    kwargs |= KwargsT(expand=4, prefilter=False, func=func, ep_clip=ep) | kwargs
 
     if opstart is not None and opend is not None:
-        op_mask = diff_creditless(ep[opstart:opend + 1], ncop[:opend - opstart + 1], opstart, **kwargs)
+        op_mask = diff_creditless(ep[opstart:opend + 1], ncop[:opend - opstart + 1], thr, opstart, **kwargs)
 
     if edstart is not None and edend is not None:
-        ed_mask = diff_creditless(ep[edstart:edend + 1], nced[:edend - edstart + 1], edstart, **kwargs)
+        ed_mask = diff_creditless(ep[edstart:edend + 1], nced[:edend - edstart + 1], thr, edstart, **kwargs)
 
     if op_mask and ed_mask:
         return ExprOp.ADD.combine(op_mask, ed_mask)
