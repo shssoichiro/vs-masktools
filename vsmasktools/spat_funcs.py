@@ -57,7 +57,7 @@ def adg_mask(
 
     is_integer = y.format.sample_type == vs.INTEGER
 
-    x_string, aft_int = (f'x {peak} / ', f' {peak} * 0.5 +') if is_integer else ('x ', '')
+    x_string, aft_int = (f'x {peak} / ', f' {peak} * 0.5 +') if is_integer else ('x ', '0 1 clamp')
 
     if relative:
         x_string += 'Y! Y@ 0.5 < x.PMin 0 max 0.5 / log Y@ * x.PMax 1.0 min 0.5 / log Y@ * ? '
