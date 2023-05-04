@@ -7,7 +7,8 @@ from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
 from vstools import (
-    CustomEnum, VSFunctionAllArgs, check_variable, core, depth, get_peak_value, get_y, iterate, plane, scale_value, vs
+    ColorRange, CustomEnum, VSFunctionAllArgs, check_variable, core, depth, get_peak_value, get_y, iterate, plane,
+    scale_value, vs
 )
 
 from .details import multi_detail_mask
@@ -164,9 +165,9 @@ class _dre_edgemask(CustomEnum):
         add_clip = ExprOp.ADD(tcanny, kirsch)
 
         if brz > 0:
-            return Morpho.binarize(add_clip, brz)
+            add_clip = Morpho.binarize(add_clip, brz)
 
-        return add_clip
+        return ColorRange.FULL.apply(add_clip)
 
 
 dre_edgemask = _dre_edgemask.RETINEX
