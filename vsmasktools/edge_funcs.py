@@ -147,7 +147,7 @@ class _dre_edgemask(CustomEnum):
     @overload
     def __call__(  # type: ignore
         self: Literal[CLAHE], src: vs.VideoNode, tsigma: float = 1, brz: float = 0.122,
-        *, limit: float = 0.3, tile: int = 5
+        *, limit: float = 0.305, tile: int = 5
     ) -> vs.VideoNode:
         ...
 
@@ -161,12 +161,12 @@ class _dre_edgemask(CustomEnum):
 
         kirsch = Kirsch(MagDirection.N | MagDirection.EAST).edgemask(luma)
 
-        maxclip = ExprOp.MAX(tcanny, kirsch)
+        add_clip = ExprOp.ADD(tcanny, kirsch)
 
         if brz > 0:
-            return Morpho.binarize(maxclip, brz)
+            return Morpho.binarize(add_clip, brz)
 
-        return maxclip
+        return add_clip
 
 
 dre_edgemask = _dre_edgemask.RETINEX
