@@ -12,14 +12,14 @@ from vstools import ColorRange, KwargsT, depth, get_depth, join, split, vs
 
 from ..morpho import Morpho
 from ..types import XxpandMode
-from ._abstract import EdgeDetect, EuclidianDistance, MagnitudeMatrix, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
+from ._abstract import EdgeDetect, EuclideanDistance, MagnitudeMatrix, MatrixEdgeDetect, Max, RidgeDetect, SingleMatrix
 
 __all__ = [
     'Matrix3x3',
     # Single matrix
     'Laplacian1', 'Laplacian2', 'Laplacian3', 'Laplacian4',
     'Kayyali',
-    # Euclidian Distance
+    # Euclidean Distance
     'Tritical', 'TriticalTCanny',
     'Cross',
     'Prewitt', 'PrewittStd', 'PrewittTCanny',
@@ -70,8 +70,8 @@ class Kayyali(SingleMatrix, Matrix3x3):
     matrices = [[6, 0, -6, 0, 0, 0, -6, 0, 6]]
 
 
-# Euclidian Distance
-class Tritical(RidgeDetect, EuclidianDistance, Matrix3x3):
+# Euclidean Distance
+class Tritical(RidgeDetect, EuclideanDistance, Matrix3x3):
     """
     Operator used in Tritical's original TCanny filter.
     Plain and simple orthogonal first order derivative.
@@ -93,7 +93,7 @@ class TriticalTCanny(Matrix3x3, EdgeDetect):
         return clip.tcanny.TCanny(op=0, **(KwargsT(sigma=0, mode=1) | kwargs))
 
 
-class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
+class Cross(RidgeDetect, EuclideanDistance, Matrix3x3):
     """
     "HotDoG" Operator from AVS ExTools by Dogway.
     Plain and simple cross first order derivative.
@@ -105,7 +105,7 @@ class Cross(RidgeDetect, EuclidianDistance, Matrix3x3):
     ]
 
 
-class Prewitt(RidgeDetect, EuclidianDistance, Matrix3x3):
+class Prewitt(RidgeDetect, EuclideanDistance, Matrix3x3):
     """Judith M. S. Prewitt operator."""
 
     matrices = [
@@ -128,7 +128,7 @@ class PrewittTCanny(Matrix3x3, EdgeDetect):
         return clip.tcanny.TCanny(op=1, **(KwargsT(sigma=0, mode=1, scale=2) | kwargs))
 
 
-class Sobel(RidgeDetect, EuclidianDistance, Matrix3x3):
+class Sobel(RidgeDetect, EuclideanDistance, Matrix3x3):
     """Sobel–Feldman operator."""
 
     matrices = [
@@ -160,7 +160,7 @@ class ASobel(Matrix3x3, EdgeDetect):
         )
 
 
-class Scharr(RidgeDetect, EuclidianDistance, Matrix3x3):
+class Scharr(RidgeDetect, EuclideanDistance, Matrix3x3):
     """
     Original H. Scharr optimised operator which attempts
     to achieve the perfect rotational symmetry with coefficients 3 and 10.
@@ -173,7 +173,7 @@ class Scharr(RidgeDetect, EuclidianDistance, Matrix3x3):
     divisors = [3, 3]
 
 
-class RScharr(RidgeDetect, EuclidianDistance, Matrix3x3):
+class RScharr(RidgeDetect, EuclideanDistance, Matrix3x3):
     """
     Refined H. Scharr operator to more accurately calculate
     1st derivatives for a 3x3 kernel with coeffs 47 and 162.
@@ -193,7 +193,7 @@ class ScharrTCanny(Matrix3x3, EdgeDetect):
         return clip.tcanny.TCanny(op=2, **(KwargsT(sigma=0, mode=1, scale=4 / 3) | kwargs))  # type: ignore
 
 
-class Kroon(RidgeDetect, EuclidianDistance, Matrix3x3):
+class Kroon(RidgeDetect, EuclideanDistance, Matrix3x3):
     """Dirk-Jan Kroon operator."""
 
     matrices = [
@@ -252,7 +252,7 @@ class FreyChen(MatrixEdgeDetect):
         raise NotImplementedError
 
 
-class FreyChenG41(RidgeDetect, EuclidianDistance, Matrix3x3):
+class FreyChenG41(RidgeDetect, EuclideanDistance, Matrix3x3):
     """"Chen Frei" operator. 3x3 matrices from G41Fun."""
 
     matrices = [

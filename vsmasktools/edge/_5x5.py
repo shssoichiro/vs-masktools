@@ -5,14 +5,14 @@ from typing import Any, Sequence
 
 from vstools import ColorRange, depth, vs
 
-from ._abstract import EdgeDetect, EuclidianDistance, Max, RidgeDetect, SingleMatrix
+from ._abstract import EdgeDetect, EuclideanDistance, Max, RidgeDetect, SingleMatrix
 
 __all__ = [
     'Matrix5x5',
     # Single matrix
     'ExLaplacian1', 'ExLaplacian2', 'ExLaplacian3', 'ExLaplacian4',
     'LoG',
-    # Euclidian distance
+    # Euclidean distance
     'ExPrewitt',
     'ExSobel',
     'FDoG', 'FDoGTCanny',
@@ -58,8 +58,8 @@ class LoG(SingleMatrix, Matrix5x5):
     matrices = [[0, 0, -1, 0, 0, 0, -1, -2, -1, 0, -1, -2, 16, -2, -1, 0, -1, -2, -1, 0, 0, 0, -1, 0, 0]]
 
 
-# Euclidian distance
-class ExPrewitt(RidgeDetect, EuclidianDistance, Matrix5x5):
+# Euclidean distance
+class ExPrewitt(RidgeDetect, EuclideanDistance, Matrix5x5):
     """Extended Judith M. S. Prewitt operator."""
 
     matrices = [
@@ -68,7 +68,7 @@ class ExPrewitt(RidgeDetect, EuclidianDistance, Matrix5x5):
     ]
 
 
-class ExSobel(RidgeDetect, EuclidianDistance, Matrix5x5):
+class ExSobel(RidgeDetect, EuclideanDistance, Matrix5x5):
     """Extended Sobel–Feldman operator."""
 
     matrices = [
@@ -77,7 +77,7 @@ class ExSobel(RidgeDetect, EuclidianDistance, Matrix5x5):
     ]
 
 
-class FDoG(RidgeDetect, EuclidianDistance, Matrix5x5):
+class FDoG(RidgeDetect, EuclideanDistance, Matrix5x5):
     """Flow-based Difference of Gaussian"""
 
     matrices = [
@@ -94,7 +94,7 @@ class FDoGTCanny(Matrix5x5, EdgeDetect):
         return clip.tcanny.TCanny(kwargs.pop('sigma', 0), mode=1, op=6, scale=0.5, **kwargs)
 
 
-class DoG(EuclidianDistance, Matrix5x5):
+class DoG(EuclideanDistance, Matrix5x5):
     """Zero-cross (of the 2nd derivative) of a Difference of Gaussians"""
 
     matrices = [
@@ -113,7 +113,7 @@ class DoG(EuclidianDistance, Matrix5x5):
         return vs.core.std.Expr(clips, 'x y -')
 
 
-class Farid(RidgeDetect, EuclidianDistance, Matrix5x5):
+class Farid(RidgeDetect, EuclideanDistance, Matrix5x5):
     """Farid & Simoncelli operator."""
 
     matrices = [[

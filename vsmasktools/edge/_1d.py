@@ -7,7 +7,7 @@ from typing import Any, Sequence
 
 from vstools import ColorRange, depth, vs
 
-from ._abstract import EdgeDetect, EuclidianDistance
+from ._abstract import EdgeDetect, EuclideanDistance
 
 __all__ = [
     'Matrix1D',
@@ -123,7 +123,7 @@ class Matrix1D(EdgeDetect, ABC):
     ...
 
 
-class TEdge(EuclidianDistance, Matrix1D):
+class TEdge(EuclideanDistance, Matrix1D):
     """(TEdgeMasktype=2) Avisynth plugin."""
 
     matrices = [
@@ -141,7 +141,7 @@ class TEdgeTedgemask(Matrix1D, EdgeDetect):
         return clip.tedgemask.TEdgeMask(threshold=0, type=2)  # type: ignore
 
 
-class SavitzkyGolay(EuclidianDistance, Matrix1D):
+class SavitzkyGolay(EuclideanDistance, Matrix1D):
     mode_types = ['h', 'v']
 
 

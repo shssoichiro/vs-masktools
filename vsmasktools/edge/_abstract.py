@@ -16,7 +16,7 @@ __all__ = [
     'EdgeDetect', 'EdgeDetectT',
     'RidgeDetect', 'RidgeDetectT',
 
-    'MatrixEdgeDetect', 'SingleMatrix', 'EuclidianDistance', 'MagnitudeMatrix',
+    'MatrixEdgeDetect', 'SingleMatrix', 'EuclideanDistance', 'MagnitudeMatrix',
 
     'Max',
 
@@ -349,7 +349,7 @@ class SingleMatrix(MatrixEdgeDetect, ABC):
         raise NotImplementedError
 
 
-class EuclidianDistance(MatrixEdgeDetect, ABC):
+class EuclideanDistance(MatrixEdgeDetect, ABC):
     def _merge_edge(self, clips: Sequence[vs.VideoNode]) -> vs.VideoNode:
         return core.std.Expr(clips, 'x x * y y * + sqrt')
 
@@ -392,7 +392,7 @@ def get_all_edge_detects(
     all_subclasses = {
         s for s in _all_subclasses()
         if s.__name__ not in {
-            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclidianDistance', 'Max',
+            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclideanDistance', 'Max',
             'Matrix1D', 'SavitzkyGolay', 'SavitzkyGolayNormalise',
             'Matrix2x2', 'Matrix3x3', 'Matrix5x5'
         }
@@ -424,7 +424,7 @@ def get_all_ridge_detect(
     all_subclasses = {
         s for s in _all_subclasses()
         if s.__name__ not in {
-            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclidianDistance', 'Max',
+            'MatrixEdgeDetect', 'RidgeDetect', 'SingleMatrix', 'EuclideanDistance', 'Max',
             'Matrix1D', 'SavitzkyGolay', 'SavitzkyGolayNormalise',
             'Matrix2x2', 'Matrix3x3', 'Matrix5x5'
         }
