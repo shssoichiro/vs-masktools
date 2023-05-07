@@ -49,7 +49,7 @@ def diff_rescale(
 
 
 def diff_creditless(
-    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: float = 0.1,
+    credit_clip: vs.VideoNode, nc_clip: vs.VideoNode, thr: float = 0.01,
     start_frame: int = 0, expand: int = 2, *, prefilter: bool | int = False,
     ep_clip: vs.VideoNode | None = None, func: FuncExceptT | None = None, **kwargs: Any
 ) -> vs.VideoNode:
@@ -72,7 +72,7 @@ def diff_creditless(
         format=diff_fmt, split_planes=True
     )
 
-    mask = Morpho.binarize(ExLaplacian4.edgemask(diff), thr / 10)
+    mask = ExLaplacian4.edgemask(diff, lthr=thr, hthr=thr)
     mask = Morpho.expand(mask, 2 + expand, mode=XxpandMode.ELLIPSE)
 
     if not ep_clip or ep_clip.num_frames == mask.num_frames:

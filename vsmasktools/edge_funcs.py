@@ -132,9 +132,9 @@ class _dre_edgemask(CustomEnum):
             return retinex(clip, sigmas, 0.001, 0.005)
 
         if self is self.CLAHE:  # type: ignore
-            limit, tile = kwargs.get('limit', 0.305), kwargs.get('tile', 5)
+            limit, tile = kwargs.get('limit', 0.0305), kwargs.get('tile', 5)
 
-            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit / 10, 32, 16), tile), clip)
+            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit, 32, 16), tile), clip)
 
         return clip
 
@@ -148,7 +148,7 @@ class _dre_edgemask(CustomEnum):
     @overload
     def __call__(  # type: ignore
         self: Literal[CLAHE], src: vs.VideoNode, tsigma: float = 1, brz: float = 0.122,
-        *, limit: float = 0.305, tile: int = 5
+        *, limit: float = 0.0305, tile: int = 5
     ) -> vs.VideoNode:
         ...
 

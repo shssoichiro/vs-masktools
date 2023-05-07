@@ -139,11 +139,11 @@ def retinex(
     )
 
 
-def flat_mask(src: vs.VideoNode, radius: int = 5, thr: float = 0.11, gauss: bool = False) -> vs.VideoNode:
+def flat_mask(src: vs.VideoNode, radius: int = 5, thr: float = 0.011, gauss: bool = False) -> vs.VideoNode:
     luma = get_y(src)
 
     blur = gauss_blur(luma, radius * 0.361083333) if gauss else box_blur(luma, radius)
 
-    mask = depth(luma, 8).abrz.AdaptiveBinarize(depth(blur, 8), scale_value(thr / 10, 32, 8))
+    mask = depth(luma, 8).abrz.AdaptiveBinarize(depth(blur, 8), scale_value(thr, 32, 8))
 
     return depth(mask, luma, dither_type=DitherType.NONE, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
