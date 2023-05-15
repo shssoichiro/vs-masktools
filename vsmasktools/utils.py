@@ -171,9 +171,6 @@ def replace_squaremask(
 
     mask = squaremask(clipb[0], *mask_params, invert, func)
 
-    if ranges is None:
-        ranges = [(None, None)]
-
     if isinstance(blur_sigma, int):
         mask = box_blur(mask, blur_sigma)
     elif isinstance(blur_sigma, float):
