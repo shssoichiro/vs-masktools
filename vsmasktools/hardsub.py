@@ -8,9 +8,9 @@ from vsexprtools import ExprOp, ExprToken, expr_func, norm_expr
 from vskernels import Catrom
 from vsrgtools.util import mean_matrix
 from vstools import (
-    CustomOverflowError, FileNotExistsError, VSFunction, check_variable, core, depth, fallback, get_neutral_value,
-    get_neutral_values, get_y, insert_clip, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value, vs,
-    vs_object
+    CustomOverflowError, FileNotExistsError, FormatsRefClipMismatchError, FrameRangesN, LengthMismatchError, VSFunction,
+    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, insert_clip, iterate,
+    normalize_ranges, replace_ranges, scale_8bit, scale_value, vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -32,14 +32,16 @@ __all__ = [
     'bounded_dehardsub',
     'diff_hardsub_mask',
 
-    'get_all_sign_masks'
+    'get_all_sign_masks',
+    
+    'custom_mask_clip'
 ]
 
 
 @dataclass
 class HardsubManual(GeneralMask, vs_object):
     path: str | Path
-    processing: VSFunction = core.lazy.std.Binarize  # type: ignore
+    processing: VSFunction = core.lazy.std.Binarize
 
     def __post_init__(self) -> None:
         if not (path := Path(self.path)).is_dir():
@@ -317,3 +319,30 @@ def get_all_sign_masks(hrdsb: vs.VideoNode, ref: vs.VideoNode, signs: list[Hards
         mask = replace_ranges(mask, ExprOp.ADD.combine(mask, sign.get_mask(hrdsb, ref)), sign.ranges)
 
     return mask.std.Limiter()
+
+
+def custom_mask_clip(
+    clip: vs.VideoNode, ref: vs.VideoNode | None = None,
+    imgs: list[str | Path] = [], ranges: FrameRangesN = [],
+    show_mask: bool = True
+) -> vs.VideoNode:
+    if ref:
+        FormatsRefClipMismatchError.check(custom_mask_clip, clip, ref)
+
+    LengthMismatchError.check(
+        custom_mask_clip, len(imgs), len(ranges),
+        message="`imgs` and `ranges` must be of the same length!"
+    )
+
+    ref = ref or clip
+    blank = ref.std.BlankClip(keep=True)
+
+    masks = [core.imwri.Read(str(x)) * ref.num_frames for x in imgs]
+
+    for mask, frange in zip(masks, ranges):
+        blank = replace_ranges(blank, mask, frange)
+
+    if show_mask:
+        return blank
+
+    return core.std.MaskedMerge(clip, ref, blank)
