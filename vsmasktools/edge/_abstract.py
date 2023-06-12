@@ -6,8 +6,9 @@ from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vstools import (
-    ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, PlanesT, T, check_variable, core, get_lowest_values,
-    get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane, scale_value, vs
+    ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, KwargsT, PlanesT, T, check_variable, core,
+    get_lowest_values, get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane,
+    scale_value, vs
 )
 
 from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
@@ -128,6 +129,8 @@ class BaseDetect:
 class EdgeDetect(ABC):
     """Abstract edge detection interface."""
 
+    kwargs: KwargsT | None = None
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
 
@@ -175,7 +178,8 @@ class EdgeDetect(ABC):
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
 
-        kwargs = self.kwargs | kwargs
+        if self.kwargs:
+            kwargs = self.kwargs | kwargs
 
         peak = get_peak_value(clip)
         hthr = 1.0 if hthr is None else hthr
