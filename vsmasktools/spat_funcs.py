@@ -5,14 +5,18 @@ from typing import Sequence, overload
 from vsexprtools import ExprOp, ExprVars, complexpr_available, norm_expr
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
-    ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, get_lowest_value,
-    get_peak_value, get_sample_type, get_y, plane, scale_value, vs
+    ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, fallback,
+    get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_8bit, scale_value, vs
 )
+
+from .edge import MinMax
+from .morpho import Morpho
 
 __all__ = [
     'adg_mask',
     'retinex',
-    'flat_mask'
+    'flat_mask',
+    'texture_mask'
 ]
 
 
@@ -147,3 +151,45 @@ def flat_mask(src: vs.VideoNode, radius: int = 5, thr: float = 0.011, gauss: boo
     mask = depth(luma, 8).abrz.AdaptiveBinarize(depth(blur, 8), scale_value(thr, 32, 8))
 
     return depth(mask, luma, dither_type=DitherType.NONE, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
+
+
+def texture_mask(
+    clip: vs.VideoNode, rady: int = 2, radc: int | None = None,
+    blur: int | float = 8, thr: float = 0.2,
+    stages: list[tuple[int, int]] = [(60, 2), (40, 4), (20, 2)],
+    points: list[tuple[bool, float]] = [(False, 1.75), (True, 2.5), (True, 5), (False, 10)]
+) -> vs.VideoNode:
+    levels = [x for x, _ in points]
+    _points = [scale_value(x, 8, clip) for _, x in points]
+
+    qm, peak = len(points), get_peak_value(clip)
+
+    rmask = MinMax(rady, fallback(radc, rady)).edgemask(clip, lthr=0)
+
+    emask = clip.std.Prewitt()
+
+    rm_txt = ExprOp.MIN(rmask, (
+        Morpho.minimum(Morpho.binarize(emask, scale_8bit(32, thr), 1.0, 0), iterations=it)
+        for thr, it in stages
+    ))
+
+    expr = [f'x {_points[0]} < x {_points[-1]} > or 0']
+
+    for x in range(len(_points) - 1):
+        if _points[x + 1] < _points[-1]:
+            expr.append(f'x {_points[x+1]} <=')
+
+        if levels[x] == levels[x + 1]:
+            expr.append(f'{peak if levels[x] else 0}')
+        else:
+            mean = peak * (levels[x + 1] - levels[x]) / (_points[x + 1] - _points[x])
+            expr.append(f'x {_points[x]} - {mean} * {peak * levels[x]} +')
+
+    weighted = norm_expr(rm_txt, [expr, ExprOp.TERN * (qm - 1)])
+
+    if isinstance(blur, float):
+        weighted = gauss_blur(weighted, blur)
+    else:
+        weighted = box_blur(weighted, blur)
+
+    return norm_expr(weighted, f'x {peak * thr} - {1 / (1 - thr)} *')
