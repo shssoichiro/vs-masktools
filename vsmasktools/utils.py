@@ -7,7 +7,7 @@ from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
     CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, P, check_ref_clip, check_variable, check_variable_format,
-    core, depth, flatten, get_peak_value, insert_clip, replace_ranges, split, vs
+    core, depth, flatten, get_peak_value, insert_clip, normalize_ranges, replace_ranges, split, vs
 )
 
 from .abstract import GeneralMask
@@ -182,6 +182,11 @@ def replace_squaremask(
         return mask
 
     merge = clipa.std.MaskedMerge(clipb, mask)
+
+    ranges = normalize_ranges(clipa, ranges)
+
+    if len(ranges) == 1 and ranges[0] == (0, clipa.num_frames - 1):
+        return merge
 
     return replace_ranges(clipa, merge, ranges)
 
