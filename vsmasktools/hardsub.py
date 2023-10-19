@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from abc import abstractmethod
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +9,9 @@ from vsexprtools import ExprOp, ExprToken, expr_func, norm_expr
 from vskernels import Catrom
 from vsrgtools.util import mean_matrix
 from vstools import (
-    CustomOverflowError, FileNotExistsError, FormatsRefClipMismatchError, FrameRangesN, LengthMismatchError, VSFunction,
-    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, insert_clip, iterate,
-    normalize_ranges, replace_ranges, scale_8bit, scale_value, vs, vs_object
+    CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN, Matrix, VSFunction,
+    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, iterate, normalize_ranges,
+    replace_ranges, scale_8bit, scale_value, vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -20,7 +21,8 @@ from .types import GenericMaskT
 from .utils import normalize_mask
 
 __all__ = [
-    'HardsubManual',
+    'CustomMaskFromFolder',
+    'CustomMaskFromRanges',
 
     'HardsubMask',
     'HardsubSignFades',
@@ -32,31 +34,26 @@ __all__ = [
     'bounded_dehardsub',
     'diff_hardsub_mask',
 
-    'get_all_sign_masks',
-
-    'custom_mask_clip'
+    'get_all_sign_masks'
 ]
 
 
+class _base_cmaskcar(vs_object):
+    clips: list[vs.VideoNode]
+
+    @abstractmethod
+    def frame_ranges(self, clip: vs.VideoNode) -> list[list[tuple[int, int]]]:
+        ...
+
+    def __vs_del__(self, core_id: int) -> None:
+        super().__vs_del__(core_id)
+
+        self.clips.clear()
+
+
 @dataclass
-class HardsubManual(GeneralMask, vs_object):
-    path: str | Path
-    processing: VSFunction = core.lazy.std.Binarize
-
-    def __post_init__(self) -> None:
-        if not (path := Path(self.path)).is_dir():
-            raise FileNotExistsError('"path" must be an existing path directory!', self.get_mask)
-
-        files = [file.stem for file in path.glob('*')]
-
-        self.clips = [
-            core.imwri.Read(file) for file in files
-        ]
-
-        self.ranges = [
-            (other[-1] if other else end, end)
-            for (*other, end) in (map(int, name.split('_')) for name in files)
-        ]
+class CustomMaskFromClipsAndRanges(GeneralMask, _base_cmaskcar):
+    processing: VSFunction = field(default=core.lazy.std.Binarize, kw_only=True)
 
     def get_mask(self, clip: vs.VideoNode, *args: Any) -> vs.VideoNode:  # type: ignore[override]
         assert check_variable(clip, self.get_mask)
@@ -66,18 +63,45 @@ class HardsubManual(GeneralMask, vs_object):
             keep=True, color=0
         )
 
-        for maskclip, (start_frame, end_frame) in zip(self.clips, self.ranges):
-            maskclip = maskclip.std.AssumeFPS(clip).resize.Point(format=mask.format.id)  # type: ignore
-            maskclip = self.processing(maskclip).std.Loop(end_frame - start_frame + 1)
+        matrix = Matrix.from_video(clip)
 
-            mask = insert_clip(mask, maskclip, start_frame)
+        for maskclip, mask_ranges in zip(self.clips, self.frame_ranges(clip)):
+            maskclip = maskclip.std.AssumeFPS(clip).resize.Point(format=mask.format.id, matrix=matrix)  # type: ignore
+            maskclip = self.processing(maskclip).std.Loop(mask.num_frames)
+
+            mask = replace_ranges(mask, maskclip, mask_ranges)
 
         return mask
 
-    def __vs_del__(self, core_id: int) -> None:
-        super().__vs_del__(core_id)
 
-        self.clips.clear()
+@dataclass
+class CustomMaskFromFolder(CustomMaskFromClipsAndRanges):
+    folder_path: FilePathType
+
+    def __post_init__(self) -> None:
+        if not (folder_path := Path(str(self.folder_path))).is_dir():
+            raise FileNotExistsError('"folder_path" must be an existing path directory!', self.get_mask)
+
+        self.files = [file.stem for file in folder_path.glob('*')]
+
+        self.clips = [core.imwri.Read(file) for file in self.files]
+
+    def frame_ranges(self, clip: vs.VideoNode) -> list[list[tuple[int, int]]]:
+        return [
+            [(other[-1] if other else end, end)]
+            for (*other, end) in (map(int, name.split('_')) for name in self.files)
+        ]
+
+
+@dataclass
+class CustomMaskFromRanges(CustomMaskFromClipsAndRanges):
+    ranges: dict[FilePathType, FrameRangeN | FrameRangesN]
+
+    def __post_init__(self) -> None:
+        self.clips = [core.imwri.Read(str(file)) for file in self.ranges.keys()]
+
+    def frame_ranges(self, clip: vs.VideoNode) -> list[list[tuple[int, int]]]:
+        return [normalize_ranges(clip, ranges) for ranges in self.ranges.values()]
 
 
 class HardsubMask(DeferredMask):
@@ -319,30 +343,3 @@ def get_all_sign_masks(hrdsb: vs.VideoNode, ref: vs.VideoNode, signs: list[Hards
         mask = replace_ranges(mask, ExprOp.ADD.combine(mask, sign.get_mask(hrdsb, ref)), sign.ranges)
 
     return mask.std.Limiter()
-
-
-def custom_mask_clip(
-    clip: vs.VideoNode, ref: vs.VideoNode | None = None,
-    imgs: list[str | Path] = [], ranges: FrameRangesN = [],
-    show_mask: bool = True
-) -> vs.VideoNode:
-    if ref:
-        FormatsRefClipMismatchError.check(custom_mask_clip, clip, ref)
-
-    LengthMismatchError.check(
-        custom_mask_clip, len(imgs), len(ranges),
-        message="`imgs` and `ranges` must be of the same length!"
-    )
-
-    ref = ref or clip
-    blank = ref.std.BlankClip(keep=True)
-
-    masks = [core.imwri.Read(str(x)) * ref.num_frames for x in imgs]
-
-    for mask, frange in zip(masks, ranges):
-        blank = replace_ranges(blank, mask, frange)
-
-    if show_mask:
-        return blank
-
-    return core.std.MaskedMerge(clip, ref, blank)
