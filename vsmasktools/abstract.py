@@ -5,10 +5,8 @@ from typing import Any, Sequence
 
 from vsexprtools import ExprOp, norm_expr
 from vsrgtools import box_blur
-from vstools import (
-    ColorRange, FrameRangeN, FrameRangesN, FramesLengthError, Position, Size, check_variable, depth, get_peak_value,
-    normalize_seq, replace_ranges, vs
-)
+from vstools import (ColorRange, FrameRangeN, FrameRangesN, FramesLengthError, Position, Size,
+                     check_variable, depth, get_peak_value, inject_self, normalize_seq, replace_ranges, vs)
 
 __all__ = [
     'GeneralMask',
@@ -21,6 +19,12 @@ class GeneralMask(ABC):
     @abstractmethod
     def get_mask(self, clip: vs.VideoNode, *args: Any, **kwargs: Any) -> vs.VideoNode:
         ...
+
+    @inject_self.init_kwargs.clean
+    def apply_mask(
+        self, _clipa: vs.VideoNode, _clipb: vs.VideoNode, _ref: vs.VideoNode | None = None, /, **kwargs: Any
+    ) -> vs.VideoNode:
+        return _clipa.std.MaskedMerge(_clipb, self.get_mask(_ref or _clipa))
 
 
 class BoundingBox(GeneralMask):
