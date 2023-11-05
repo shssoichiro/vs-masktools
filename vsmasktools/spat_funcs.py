@@ -6,7 +6,7 @@ from vsexprtools import ExprOp, ExprVars, complexpr_available, norm_expr
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
     ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, fallback,
-    get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_8bit, scale_value, vs
+    get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_8bit, scale_value, to_arr, vs
 )
 
 from .edge import MinMax
@@ -42,43 +42,44 @@ def adg_mask(
 
     assert check_variable(clip, func)
 
-    y = plane(clip, 0).std.PlaneStats(prop='P')
+    luma, prop = plane(clip, 0), 'P' if complexpr_available else None
+    y, y_inv = luma.std.PlaneStats(prop=prop), luma.std.Invert().std.PlaneStats(prop=prop)
 
-    if not complexpr_available:
-        if relative:
-            raise CustomRuntimeError(
-                "You don't have akarin plugin, you can't use this function!", func, 'relative=True'
-            )
-
-        if isinstance(luma_scaling, Sequence):
-            return [y.adg.Mask(ls) for ls in luma_scaling]  # type: ignore
-
-        return y.adg.Mask(luma_scaling)  # type: ignore
+    if not complexpr_available and relative:
+        raise CustomRuntimeError(
+            "You don't have akarin plugin, you can't use this function!", func, 'relative=True'
+        )
 
     assert y.format
 
-    peak = get_peak_value(y)
+    if complexpr_available:
+        peak = get_peak_value(y)
 
-    is_integer = y.format.sample_type == vs.INTEGER
+        is_integer = y.format.sample_type == vs.INTEGER
 
-    x_string, aft_int = (f'x {peak} / ', f' {peak} * 0.5 +') if is_integer else ('x ', '0 1 clamp')
+        x_string, aft_int = (f'x {peak} / ', f' {peak} * 0.5 +') if is_integer else ('x ', '0 1 clamp')
 
-    if relative:
-        x_string += 'Y! Y@ 0.5 < x.PMin 0 max 0.5 / log Y@ * x.PMax 1.0 min 0.5 / log Y@ * ? '
+        if relative:
+            x_string += 'Y! Y@ 0.5 < x.PMin 0 max 0.5 / log Y@ * x.PMax 1.0 min 0.5 / log Y@ * ? '
 
-    x_string += '0 0.999 clamp X!'
+        x_string += '0 0.999 clamp X!'
 
-    def _adgfunc(ls: float) -> vs.VideoNode:
-        return norm_expr(
-            y, f'{x_string} 1 X@ X@ X@ X@ X@ '
-            '18.188 * 45.47 - * 36.624 + * 9.466 - * 1.124 + * - '
-            f'x.PAverage 2 pow {ls} * pow {aft_int}'
-        )
+        def _adgfunc(luma: vs.VideoNode, ls: float) -> vs.VideoNode:
+            return norm_expr(
+                luma, f'{x_string} 1 X@ X@ X@ X@ X@ '
+                '18.188 * 45.47 - * 36.624 + * 9.466 - * 1.124 + * - '
+                f'x.PAverage 2 pow {ls} * pow {aft_int}'
+            )
+    else:
+        def _adgfunc(luma: vs.VideoNode, ls: float) -> vs.VideoNode:
+            return luma.adg.Mask(ls)  # type: ignore
+
+    scaled_clips = [_adgfunc(y_inv if ls < 0 else y, abs(ls)) for ls in to_arr(luma_scaling)]
 
     if isinstance(luma_scaling, Sequence):
-        return [_adgfunc(ls) for ls in luma_scaling]
+        return scaled_clips
 
-    return _adgfunc(luma_scaling)
+    return scaled_clips[0]
 
 
 def retinex(
