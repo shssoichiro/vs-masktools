@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, IntFlag, auto
 from typing import Any, ClassVar, NoReturn, Sequence, TypeAlias
 
+from stgpytools import inject_kwargs_params
 from vsexprtools import ExprOp, ExprToken, norm_expr
 from vstools import (
     ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, KwargsT, PlanesT, T, check_variable, core,
@@ -149,6 +150,7 @@ class EdgeDetect(ABC):
         return BaseDetect.ensure_obj(cls, edge_detect, UnknownEdgeDetectError, [], func_except)
 
     @inject_self
+    @inject_kwargs_params
     def edgemask(
         self, clip: vs.VideoNode, lthr: float = 0.0, hthr: float | None = None, multi: float = 1.0,
         clamp: bool | tuple[float, float] | list[tuple[float, float]] = False,
@@ -177,9 +179,6 @@ class EdgeDetect(ABC):
         feature: _Feature = _Feature.EDGE, planes: PlanesT | tuple[PlanesT, bool] = None, **kwargs: Any
     ) -> vs.VideoNode:
         assert check_variable(clip, self.__class__)
-
-        if self.kwargs:
-            kwargs = self.kwargs | kwargs
 
         peak = get_peak_value(clip)
         hthr = 1.0 if hthr is None else hthr
