@@ -178,7 +178,7 @@ def texture_mask(
 
     for x in range(len(_points) - 1):
         if _points[x + 1] < _points[-1]:
-            expr.append(f'x {_points[x+1]} <=')
+            expr.append(f'x {_points[x + 1]} <=')
 
         if levels[x] == levels[x + 1]:
             expr.append(f'{peak if levels[x] else 0}')
