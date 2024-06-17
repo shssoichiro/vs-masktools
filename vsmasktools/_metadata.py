@@ -1,6 +1,6 @@
 """Various masking tools for VapourSynth"""
 
-__version__ = '1.2.1'
+__version__ = '1.3.0'
 
 __author_name__, __author_email__ = 'Irrational Encoding Wizardry', 'wizards@encode.moe'
 __maintainer_name__, __maintainer_email__ = 'Setsugen no ao', 'setsugen@setsugen.dev'
