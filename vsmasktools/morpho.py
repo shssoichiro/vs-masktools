@@ -90,7 +90,7 @@ class Morpho:
             if isinstance(coords, tuple):
                 size, mode = coords
             else:
-                size, mode = coords, ConvMode.SQUARE
+                size, mode = coords, ConvMode.HV
 
             assert size > 1
 
@@ -102,7 +102,7 @@ class Morpho:
         else:
             coords = list(coords)
             coords.insert(len(coords) // 2, 1)
-            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.SQUARE
+            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.HV
 
         matrix = ExprOp.matrix('x', radius, mode, exclude)
 
@@ -134,9 +134,9 @@ class Morpho:
             kwargs.update(expr=self._morpho_xx_imum(src, thr, op, coords, multiply))
         elif isinstance(coords, (int, tuple)):
             if isinstance(coords, tuple):
-                if coords[1] is not ConvMode.SQUARE:
+                if coords[1] is not ConvMode.HV:
                     raise CustomIndexError(
-                        'with fast=False or no akarin plugin, you must have ConvMode.SQUARE!', func, coords
+                        'with fast=False or no akarin plugin, you must have ConvMode.HV!', func, coords
                     )
 
                 coords = coords[0]
