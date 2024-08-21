@@ -3,15 +3,17 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Type
 
 from vsexprtools import ExprOp, ExprToken, expr_func, norm_expr
-from vskernels import Catrom
+from vskernels import Catrom, Point
 from vsrgtools.util import mean_matrix
+from vssource import IMWRI, Indexer
 from vstools import (
-    CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN, Matrix, VSFunction,
-    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, iterate, normalize_ranges,
-    replace_ranges, scale_8bit, scale_value, vs, vs_object
+    ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN,
+    Matrix, VSFunction, check_variable, core, depth, fallback, get_neutral_value,
+    get_neutral_values, get_y, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value,
+    vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -52,8 +54,9 @@ class _base_cmaskcar(vs_object):
 @dataclass
 class CustomMaskFromClipsAndRanges(GeneralMask, _base_cmaskcar):
     processing: VSFunction = field(default=core.lazy.std.Binarize, kw_only=True)
+    idx: Indexer | Type[Indexer] = field(default=IMWRI, kw_only=True)
 
-    def get_mask(self, clip: vs.VideoNode, *args: Any) -> vs.VideoNode:  # type: ignore[override]
+    def get_mask(self, clip: vs.VideoNode, *args: Any, **kwargs: Any) -> vs.VideoNode:
         assert check_variable(clip, self.get_mask)
 
         mask = clip.std.BlankClip(
@@ -64,10 +67,13 @@ class CustomMaskFromClipsAndRanges(GeneralMask, _base_cmaskcar):
         matrix = Matrix.from_video(clip)
 
         for maskclip, mask_ranges in zip(self.clips, self.frame_ranges(clip)):
-            maskclip = maskclip.std.AssumeFPS(clip).resize.Point(format=mask.format.id, matrix=matrix)  # type: ignore
+            maskclip = Point.resample(
+                maskclip.std.AssumeFPS(clip), mask.format, matrix,
+                range_in=ColorRange.FULL, range=ColorRange.FULL
+            )
             maskclip = self.processing(maskclip).std.Loop(mask.num_frames)
 
-            mask = replace_ranges(mask, maskclip, mask_ranges)
+            mask = replace_ranges(mask, maskclip, mask_ranges, **kwargs)
 
         return mask
 
@@ -80,14 +86,14 @@ class CustomMaskFromFolder(CustomMaskFromClipsAndRanges):
         if not (folder_path := Path(str(self.folder_path))).is_dir():
             raise FileNotExistsError('"folder_path" must be an existing path directory!', self.get_mask)
 
-        self.files = [file.stem for file in folder_path.glob('*')]
+        self.files = list(folder_path.glob('*'))
 
-        self.clips = [core.imwri.Read(file) for file in self.files]
+        self.clips = [self.idx.source(file, bits=-1) for file in self.files]
 
     def frame_ranges(self, clip: vs.VideoNode) -> list[list[tuple[int, int]]]:
         return [
             [(other[-1] if other else end, end)]
-            for (*other, end) in (map(int, name.split('_')) for name in self.files)
+            for (*other, end) in (map(int, name.stem.split('_')) for name in self.files)
         ]
 
 
@@ -96,7 +102,7 @@ class CustomMaskFromRanges(CustomMaskFromClipsAndRanges):
     ranges: dict[FilePathType, FrameRangeN | FrameRangesN]
 
     def __post_init__(self) -> None:
-        self.clips = [core.imwri.Read(str(file)) for file in self.ranges.keys()]
+        self.clips = [self.idx.source(str(file), bits=-1) for file in self.ranges.keys()]
 
     def frame_ranges(self, clip: vs.VideoNode) -> list[list[tuple[int, int]]]:
         return [normalize_ranges(clip, ranges) for ranges in self.ranges.values()]
