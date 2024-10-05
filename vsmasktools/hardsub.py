@@ -10,10 +10,9 @@ from vskernels import Catrom, Point
 from vsrgtools.util import mean_matrix
 from vssource import IMWRI, Indexer
 from vstools import (
-    ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN,
-    Matrix, VSFunction, check_variable, core, depth, fallback, get_neutral_value,
-    get_neutral_values, get_y, iterate, normalize_ranges, replace_ranges, scale_8bit, scale_value,
-    vs, vs_object
+    ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN, Matrix, VSFunction,
+    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, iterate, normalize_ranges,
+    replace_ranges, scale_value, vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -239,9 +238,9 @@ class HardsubLine(HardsubMask):
 
         expand_n = fallback(self.expand, clip.width // 200)
 
-        y_range = scale_8bit(clip, 219) if clip.format.sample_type == vs.INTEGER else 1
-        uv_range = scale_8bit(clip, 224) if clip.format.sample_type == vs.INTEGER else 1
-        offset = scale_8bit(clip, 16) if clip.format.sample_type == vs.INTEGER else 0
+        y_range = scale_value(219, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 1
+        uv_range = scale_value(224, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 1
+        offset = scale_value(16, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 0
 
         uv_abs = ' abs ' if clip.format.sample_type == vs.FLOAT else f' {get_neutral_value(clip)} - abs '
         yexpr = f'x y - abs {y_range * 0.7} > 255 0 ?'

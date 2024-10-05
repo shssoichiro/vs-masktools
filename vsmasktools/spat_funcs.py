@@ -6,7 +6,7 @@ from vsexprtools import ExprOp, ExprVars, complexpr_available, norm_expr
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
     ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, fallback,
-    get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_8bit, scale_value, to_arr, vs
+    get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_value, to_arr, vs
 )
 
 from .edge import MinMax
@@ -161,7 +161,7 @@ def texture_mask(
     points: list[tuple[bool, float]] = [(False, 1.75), (True, 2.5), (True, 5), (False, 10)]
 ) -> vs.VideoNode:
     levels = [x for x, _ in points]
-    _points = [scale_8bit(clip, x) for _, x in points]
+    _points = [scale_value(x, 8, clip, ColorRange.FULL) for _, x in points]
 
     qm, peak = len(points), get_peak_value(clip)
 
@@ -170,7 +170,7 @@ def texture_mask(
     emask = clip.std.Prewitt()
 
     rm_txt = ExprOp.MIN(rmask, (
-        Morpho.minimum(Morpho.binarize(emask, scale_8bit(32, thr), 1.0, 0), iterations=it)
+        Morpho.minimum(Morpho.binarize(emask, scale_value(thr, 8, 32, ColorRange.FULL), 1.0, 0), iterations=it)
         for thr, it in stages
     ))
 
