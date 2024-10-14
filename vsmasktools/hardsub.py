@@ -11,7 +11,7 @@ from vsrgtools.util import mean_matrix
 from vssource import IMWRI, Indexer
 from vstools import (
     ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN, Matrix, VSFunction,
-    check_variable, core, depth, fallback, get_neutral_value, get_neutral_values, get_y, iterate, normalize_ranges,
+    check_variable, core, depth, fallback, get_peak_value, get_lowest_value, get_neutral_value, get_neutral_values, get_y, iterate, normalize_ranges,
     replace_ranges, scale_value, vs, vs_object
 )
 
@@ -130,7 +130,7 @@ class HardsubMask(DeferredMask):
 
         assert masks[-1].format is not None
 
-        thr = scale_value(self.bin_thr, 32, masks[-1], ColorRange.FULL)
+        thr = scale_value(self.bin_thr, 32, masks[-1], range_out=ColorRange.FULL)
 
         for p in partials:
             masks.append(
@@ -179,7 +179,7 @@ class HardsubSignFades(HardsubMask):
             for x in (clip, ref)
         )
 
-        highpass = scale_value(self.highpass, 32, clip, ColorRange.FULL)
+        highpass = scale_value(self.highpass, 32, clip, range_out=ColorRange.FULL)
 
         mask = norm_expr(
             [clipedge, refedge], f'x y - {highpass} < 0 {ExprToken.RangeMax} ?'
@@ -238,17 +238,16 @@ class HardsubLine(HardsubMask):
 
         expand_n = fallback(self.expand, clip.width // 200)
 
-        y_range = scale_value(219, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 1
-        uv_range = scale_value(224, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 1
-        offset = scale_value(16, 8, clip, ColorRange.FULL) if clip.format.sample_type == vs.INTEGER else 0
+        y_range = get_peak_value(clip) - get_lowest_value(clip)
+        uv_range = get_peak_value(clip, chroma=True) - get_lowest_value(clip, chroma=True)
 
         uv_abs = ' abs ' if clip.format.sample_type == vs.FLOAT else f' {get_neutral_value(clip)} - abs '
         yexpr = f'x y - abs {y_range * 0.7} > 255 0 ?'
         uv_thr = uv_range * 0.8
         uvexpr = f'x {uv_abs} {uv_thr} < y {uv_abs} {uv_thr} < and 255 0 ?'
 
-        upper = y_range * 0.8 + offset
-        lower = y_range * 0.2 + offset
+        upper = scale_value(0.8, 32, clip)
+        lower = scale_value(0.2, 32, clip)
         mindiff = y_range * 0.1
 
         difexpr = f'x {upper} > x {lower} < or x y - abs {mindiff} > and 255 0 ?'
