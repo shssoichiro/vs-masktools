@@ -241,7 +241,7 @@ class HardsubLine(HardsubMask):
         y_range = get_peak_value(clip) - get_lowest_value(clip)
         uv_range = get_peak_value(clip, chroma=True) - get_lowest_value(clip, chroma=True)
 
-        uv_abs = ' abs ' if clip.format.sample_type == vs.FLOAT else f' {get_neutral_value(clip)} - abs '
+        uv_abs = f' {get_neutral_value(clip)} - abs '
         yexpr = f'x y - abs {y_range * 0.7} > 255 0 ?'
         uv_thr = uv_range * 0.8
         uvexpr = f'x {uv_abs} {uv_thr} < y {uv_abs} {uv_thr} < and 255 0 ?'
