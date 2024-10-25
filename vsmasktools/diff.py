@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, TypeAlias, overload
 
 from vsexprtools import ExprOp, norm_expr
@@ -84,6 +85,8 @@ def credit_mask(
     blur: float | None = 1.65, prefilter: bool | int = 5,
     expand: int = 8
 ) -> vs.VideoNode:
+    warnings.warn('credit_mask: Function is deprecated and will be removed in a later version! Use based_diff_mask')
+
     if blur is not None:
         clip, ref = gauss_blur(clip, blur), gauss_blur(ref, blur)
 
