@@ -67,8 +67,8 @@ def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = T
     lo, hi = (peak, 0) if invert else (0, peak)
     inv_pre, inv_post = (peak, '-') if invert else ('', '')
 
-    thr_lo = scale_value(thr_lo, 32, clip, range_out=ColorRange.FULL)
-    thr_hi = scale_value(thr_hi, 32, clip, range_out=ColorRange.FULL)
+    thr_lo = scale_value(thr_lo, 32, clip)
+    thr_hi = scale_value(thr_hi, 32, clip)
 
     return norm_expr(
         get_y(clip),
@@ -135,7 +135,7 @@ class _dre_edgemask(CustomEnum):
         if self is self.CLAHE:  # type: ignore
             limit, tile = kwargs.get('limit', 0.0305), kwargs.get('tile', 5)
 
-            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit, 32, 16, range_out=ColorRange.FULL), tile), clip)
+            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit, 32, 16), tile), clip)
 
         return clip
 

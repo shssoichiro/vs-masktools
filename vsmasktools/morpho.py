@@ -9,7 +9,7 @@ from vsexprtools import ExprList, ExprOp, ExprToken, complexpr_available, norm_e
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
-    ColorRange, inject_self, interleave_arr, iterate, scale_value, to_arr, vs
+    inject_self, interleave_arr, iterate, scale_value, to_arr, vs
 )
 
 from .types import Coordinates, MorphoFunc, XxpandMode
@@ -112,7 +112,7 @@ class Morpho:
         matrix = ExprList(interleave_arr(matrix, op * matrix.mlength, 2))
 
         if thr is not None:
-            matrix.append('x', scale_value(thr, 32, src, range_out=ColorRange.FULL), ExprOp.SUB, ExprOp.MAX)
+            matrix.append('x', scale_value(thr, 32, src), ExprOp.SUB, ExprOp.MAX)
 
         if multiply is not None:
             matrix.append(multiply, ExprOp.MUL)
@@ -150,7 +150,7 @@ class Morpho:
 
         if not self._fast:
             if thr is not None:
-                kwargs.update(threshold=scale_value(thr, 32, src, range_out=ColorRange.FULL))
+                kwargs.update(threshold=scale_value(thr, 32, src))
 
             if multiply is not None:
                 orig_mm_func = mm_func
@@ -211,7 +211,7 @@ class Morpho:
         expr.append('x', ExprOp.MAX if inflate else ExprOp.MIN)
 
         if thr is not None:
-            thr = scale_value(thr, 32, src, range_out=ColorRange.FULL)
+            thr = scale_value(thr, 32, src)
             limit = ['x', thr, ExprOp.ADD] if inflate else ['x', thr, ExprOp.SUB, ExprToken.RangeMin, ExprOp.MAX]
 
             expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
@@ -365,7 +365,7 @@ class Morpho:
 
         eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
 
-        return norm_expr([eroded, src], 'x y -', planes)
+        return norm_expr([src, eroded], 'x y -', planes)
 
     @inject_self
     def binarize(
@@ -375,7 +375,7 @@ class Morpho:
     ) -> vs.VideoNode:
         midthr, lowval, highval = (
             thr and list(
-                scale_value(t, 32, src, range_out=ColorRange.FULL)
+                scale_value(t, 32, src)
                 for i, t in enumerate(to_arr(thr))
             ) for thr in (midthr, lowval, highval)
         )

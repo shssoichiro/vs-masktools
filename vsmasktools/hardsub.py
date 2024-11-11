@@ -179,7 +179,7 @@ class HardsubSignFades(HardsubMask):
             for x in (clip, ref)
         )
 
-        highpass = scale_value(self.highpass, 32, clip, range_out=ColorRange.FULL)
+        highpass = scale_value(self.highpass, 32, clip)
 
         mask = norm_expr(
             [clipedge, refedge], f'x y - {highpass} < 0 {ExprToken.RangeMax} ?'
