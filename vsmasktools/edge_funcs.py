@@ -8,7 +8,7 @@ from vsrgtools import gauss_blur
 from vsrgtools.util import wmean_matrix
 from vstools import (
     ColorRange, CustomEnum, VSFunctionAllArgs, check_variable, core, depth, get_peak_value, get_y, iterate, plane,
-    scale_value, vs
+    scale_value, scale_mask, vs
 )
 
 from .details import multi_detail_mask
@@ -41,7 +41,7 @@ def ringing_mask(
     assert check_variable(clip, ringing_mask)
 
     thmi, thma, thlimi, thlima = (
-        scale_value(t, 32, clip, range_out=ColorRange.FULL) for t in [thmi, thma, thlimi, thlima]
+        scale_mask(t, 32, clip) for t in [thmi, thma, thlimi, thlima]
     )
 
     edgemask = normalize_mask(credit_mask, plane(clip, 0), **kwargs).std.Limiter()
@@ -83,7 +83,7 @@ def luma_credit_mask(
 
     edge_mask = normalize_mask(edgemask, y, **kwargs)
 
-    credit_mask = norm_expr([edge_mask, y], f'y {scale_value(thr, 32, y, range_out=ColorRange.FULL)} > y 0 ? x min')
+    credit_mask = norm_expr([edge_mask, y], f'y {scale_mask(thr, 32, y)} > y 0 ? x min')
 
     if not draft:
         credit_mask = Morpho.maximum(credit_mask, iterations=4)

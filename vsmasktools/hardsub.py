@@ -13,7 +13,7 @@ from vstools import (
     ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN,
     Matrix, VSFunction, check_variable, core, depth, fallback, get_lowest_value, get_neutral_value,
     get_neutral_values, get_peak_value, get_y, iterate, normalize_ranges, replace_ranges,
-    scale_value, vs, vs_object
+    scale_value, scale_delta, vs, vs_object
 )
 
 from .abstract import DeferredMask, GeneralMask
@@ -131,7 +131,7 @@ class HardsubMask(DeferredMask):
 
         assert masks[-1].format is not None
 
-        thr = scale_value(self.bin_thr, 32, masks[-1], range_out=ColorRange.FULL)
+        thr = scale_value(self.bin_thr, 32, masks[-1])
 
         for p in partials:
             masks.append(
@@ -180,7 +180,7 @@ class HardsubSignFades(HardsubMask):
             for x in (clip, ref)
         )
 
-        highpass = scale_value(self.highpass, 32, clip)
+        highpass = scale_delta(self.highpass, 32, clip)
 
         mask = norm_expr(
             [clipedge, refedge], f'x y - {highpass} < 0 {ExprToken.RangeMax} ?'

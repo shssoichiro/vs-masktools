@@ -9,7 +9,7 @@ from vsexprtools import ExprOp, ExprToken, norm_expr
 from vstools import (
     ColorRange, CustomRuntimeError, CustomValueError, FuncExceptT, KwargsT, PlanesT, T, check_variable, core,
     get_lowest_values, get_peak_value, get_peak_values, get_subclasses, inject_self, join, normalize_planes, plane,
-    scale_value, vs
+    scale_mask, vs
 )
 
 from ..exceptions import UnknownEdgeDetectError, UnknownRidgeDetectError
@@ -183,8 +183,8 @@ class EdgeDetect(ABC):
         peak = get_peak_value(clip)
         hthr = 1.0 if hthr is None else hthr
 
-        lthr = scale_value(lthr, 32, clip, range_out=ColorRange.FULL)
-        hthr = scale_value(hthr, 32, clip, range_out=ColorRange.FULL)
+        lthr = scale_mask(lthr, 32, clip)
+        hthr = scale_mask(hthr, 32, clip)
 
         discard_planes = False
         if isinstance(planes, tuple):
