@@ -5,8 +5,10 @@ from typing import Any, Sequence
 
 from vsexprtools import ExprOp, norm_expr
 from vsrgtools import box_blur
-from vstools import (ColorRange, FrameRangeN, FrameRangesN, FramesLengthError, Position, Size,
-                     check_variable, depth, get_peak_value, inject_self, normalize_seq, replace_ranges, vs)
+from vstools import (
+    ColorRange, FrameRangeN, FrameRangesN, FramesLengthError, Position, Size,
+    check_variable, depth, inject_self, normalize_seq, replace_ranges, vs
+)
 
 __all__ = [
     'GeneralMask',
@@ -98,7 +100,7 @@ class DeferredMask(GeneralMask):
             )
 
         if self.bound:
-            return norm_expr([hm, bm], f'y {ExprOp.clamp(0, get_peak_value(hm), "x")} 0 ?')
+            return norm_expr([hm, bm], f'y {ExprOp.clamp(c="x")} 0 ?')
 
         return hm.std.Limiter()
 
