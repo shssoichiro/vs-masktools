@@ -6,7 +6,7 @@ from vsexprtools import ExprOp, complexpr_available, norm_expr
 from vskernels import Bilinear, Kernel, KernelT
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
-    CustomValueError, FrameRangeN, FrameRangesN, FuncExceptT, P, check_ref_clip, check_variable,
+    CustomValueError, ColorRange, FrameRangeN, FrameRangesN, FuncExceptT, P, check_ref_clip, check_variable,
     check_variable_format, core, depth, flatten, get_lowest_values, get_peak_values, insert_clip,
     normalize_ranges, plane, replace_ranges, split, vs
 )
@@ -252,7 +252,7 @@ def normalize_mask(
 
         mask = mask(clip, ref)
 
-    return depth(mask, clip)
+    return depth(mask, clip, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
 
 
 def rekt_partial(

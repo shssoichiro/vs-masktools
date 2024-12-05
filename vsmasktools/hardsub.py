@@ -280,7 +280,7 @@ class HardsubLine(HardsubMask):
         mask = iterate(mask, core.std.Maximum, expand_n)
         mask = mask.std.Inflate().std.Inflate().std.Convolution(mean_matrix)
 
-        return depth(mask, clip, range_in=1, range_out=1)
+        return depth(mask, clip, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
 
 
 class HardsubLineFade(HardsubLine):
