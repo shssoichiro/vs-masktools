@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any, Literal, Sequence, cast, overload
 
 from vsexprtools import ExprOp, ExprToken, norm_expr
-from vsrgtools import gauss_blur
-from vsrgtools.util import wmean_matrix
+from vsrgtools import gauss_blur, BlurMatrix
 from vstools import (
-    ColorRange, CustomEnum, VSFunctionAllArgs, check_variable, core, depth, get_peak_value, get_y, iterate, plane,
+    ColorRange, CustomEnum, VSFunctionAllArgs, check_variable, depth, get_peak_value, get_y, plane,
     scale_value, scale_mask, vs
 )
 
@@ -44,6 +42,8 @@ def ringing_mask(
         scale_mask(t, 32, clip) for t in [thmi, thma, thlimi, thlima]
     )
 
+    blur_kernel = BlurMatrix.BINOMIAL()
+
     edgemask = normalize_mask(credit_mask, plane(clip, 0), **kwargs).std.Limiter()
 
     light = norm_expr(edgemask, f'x {thlimi} - {thma - thmi} / {ExprToken.RangeMax} *')
@@ -51,14 +51,14 @@ def ringing_mask(
     shrink = Morpho.dilation(light, rad)
     shrink = Morpho.binarize(shrink, brz)
     shrink = Morpho.erosion(shrink, 2)
-    shrink = iterate(shrink, partial(core.std.Convolution, matrix=wmean_matrix), 2)
+    shrink = blur_kernel(shrink, passes=2)
 
     strong = norm_expr(edgemask, f'x {thmi} - {thlima - thlimi} / {ExprToken.RangeMax} *')
     expand = Morpho.dilation(strong, rad)
 
     mask = norm_expr([expand, strong, shrink], 'x y z max -')
 
-    return ExprOp.convolution('x', wmean_matrix, premultiply=2, multiply=2, clamp=True)(mask)
+    return ExprOp.convolution('x', blur_kernel, premultiply=2, multiply=2, clamp=True)(mask)
 
 
 def luma_mask(clip: vs.VideoNode, thr_lo: float, thr_hi: float, invert: bool = True) -> vs.VideoNode:

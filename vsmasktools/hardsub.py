@@ -7,7 +7,7 @@ from typing import Any, Type
 
 from vsexprtools import ExprOp, ExprToken, expr_func, norm_expr
 from vskernels import Bilinear, Catrom, Point
-from vsrgtools.util import mean_matrix
+from vsrgtools import box_blur
 from vssource import IMWRI, Indexer
 from vstools import (
     ColorRange, CustomOverflowError, FileNotExistsError, FilePathType, FrameRangeN, FrameRangesN,
@@ -180,7 +180,7 @@ class HardsubSignFades(HardsubMask):
 
     def _mask(self, clip: vs.VideoNode, ref: vs.VideoNode, **kwargs: Any) -> vs.VideoNode:
         clipedge, refedge = (
-            normalize_mask(self.edgemask, x, **kwargs).std.Convolution(mean_matrix)
+            box_blur(normalize_mask(self.edgemask, x, **kwargs))
             for x in (clip, ref)
         )
 
@@ -273,12 +273,12 @@ class HardsubLine(HardsubMask):
 
         clip_y, ref_y = get_y(clip), depth(get_y(ref), clip)
 
-        clips = [clip_y.std.Convolution(mean_matrix), ref_y.std.Convolution(mean_matrix)]
+        clips = [box_blur(clip_y), box_blur(ref_y)]
         diff = core.std.Expr(clips, difexpr, vs.GRAY8).std.Maximum().std.Maximum()
 
         mask: vs.VideoNode = core.misc.Hysteresis(subedge, diff)
         mask = iterate(mask, core.std.Maximum, expand_n)
-        mask = mask.std.Inflate().std.Inflate().std.Convolution(mean_matrix)
+        mask = box_blur(mask.std.Inflate().std.Inflate())
 
         return depth(mask, clip, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
 

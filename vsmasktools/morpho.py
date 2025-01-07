@@ -6,7 +6,7 @@ from math import floor, sqrt
 from typing import Any, Literal, Sequence, Tuple
 
 from vsexprtools import ExprList, ExprOp, ExprToken, complexpr_available, norm_expr
-from vsrgtools.util import wmean_matrix
+from vsrgtools import BlurMatrix
 from vstools import (
     ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
     inject_self, interleave_arr, iterate, scale_value, to_arr, vs
@@ -400,7 +400,7 @@ def grow_mask(
     dilated = morpho.dilation(closed, **kwargs)
     outer = morpho.outer_hat(dilated, radius, **kwargs)
 
-    blurred = outer.std.Convolution(wmean_matrix, planes=planes)
+    blurred = BlurMatrix.BINOMIAL()(outer, planes=planes)
 
     if multiply != 1.0:
         return blurred.std.Expr(f'x {multiply} *')
