@@ -1,180 +1,615 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from itertools import zip_longest
-from math import floor, sqrt
-from typing import Any, Literal, Sequence, Tuple
+from math import sqrt
+from typing import Any, Literal, Sequence, cast
 
-from vsexprtools import ExprList, ExprOp, ExprToken, complexpr_available, norm_expr
+from vsexprtools import ExprList, ExprOp, TupleExprList, complexpr_available, norm_expr
 from vsrgtools import BlurMatrix
 from vstools import (
-    ConvMode, CustomIndexError, FuncExceptT, PlanesT, StrList, check_variable, copy_signature, core, fallback,
-    inject_self, interleave_arr, iterate, scale_value, to_arr, vs
+    ConvMode, CustomValueError, FuncExceptT, PlanesT, SpatialConvModeT, VSFunctionAllArgs,
+    copy_signature, core, fallback, inject_self, iterate, scale_mask, scale_value, to_arr, vs
 )
 
-from .types import Coordinates, MorphoFunc, XxpandMode
+from .types import Coordinates, XxpandMode
 
 __all__ = [
-    'Morpho', 'CoordsT',
+    'RadiusT',
+    'Morpho',
     'grow_mask'
 ]
 
-CoordsT = int | Tuple[int, ConvMode] | Sequence[int]
+RadiusT = int | tuple[int, SpatialConvModeT]
 
 
-def _minmax_method(  # type: ignore
-    self: Morpho, src: vs.VideoNode, thr: float | None = None,
-    coords: CoordsT | None = [1] * 8,
-    iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-    *, func: FuncExceptT | None = None, **kwargs: Any
+def _morpho_method(
+    self: Morpho,
+    clip: vs.VideoNode,
+    radius: RadiusT = 1,
+    thr: float | None = None,
+    iterations: int = 1,
+    coords: Sequence[int] | None = None,
+    multiply: float | None = None,
+    planes: PlanesT = None,
+    *,
+    func: FuncExceptT | None = None,
+    **kwargs: Any
 ) -> vs.VideoNode:
-    ...
+    raise NotImplementedError
 
 
-def _morpho_method(  # type: ignore
-    self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-    coords: CoordsT = 5, multiply: float | None = None,
-    *, func: FuncExceptT | None = None, **kwargs: Any
+def _xxpand_method(
+    self: Morpho,
+    clip: vs.VideoNode,
+    sw: int, sh: int | None = None,
+    mode: XxpandMode = XxpandMode.RECTANGLE,
+    thr: float | None = None,
+    planes: PlanesT = None,
+    *,
+    func: FuncExceptT | None = None,
+    **kwargs: Any
 ) -> vs.VideoNode:
-    ...
+    raise NotImplementedError
 
 
-def _morpho_method2(  # type: ignore
-    self: Morpho, clip: vs.VideoNode, sw: int, sh: int | None = None, mode: XxpandMode = XxpandMode.RECTANGLE,
-    thr: float | None = None, planes: PlanesT = None, *, func: FuncExceptT | None = None, **kwargs: Any
-) -> vs.VideoNode:
-    ...
-
-
-@dataclass
 class Morpho:
-    planes: PlanesT = None
-    func: FuncExceptT | None = None
-    fast: bool | None = None
+    """Collection of morphological operations"""
 
-    def __post_init__(self) -> None:
-        self._fast = fallback(self.fast, complexpr_available) and complexpr_available
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        ...
 
-    def _check_params(
-        self, radius: int, thr: float | None, coords: CoordsT, planes: PlanesT, func: FuncExceptT
-    ) -> tuple[FuncExceptT, PlanesT]:
-        if radius < 1:
-            raise CustomIndexError('radius has to be greater than 0!', func, radius)
+    @inject_self
+    def maximum(
+        self,
+        clip: vs.VideoNode,
+        thr: float | None = None,
+        iterations: int = 1,
+        coords: Sequence[int] | None = None,
+        multiply: float | None = None,
+        planes: PlanesT = None,
+        *,
+        func: FuncExceptT | None = None,
+        **kwargs: Any
+    ) -> vs.VideoNode:
+        """
+        Replaces each pixel with the largest value in its 3x3 neighbourhood.
+        This operation is also known as dilation with a radius of 1.
 
-        if isinstance(coords, (int, tuple)):
-            size = coords if isinstance(coords, int) else coords[0]
+        :param clip:            Clip to process.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become greater than input + threshold
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the 3x3 neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly 8 numbers.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self.dilation(clip, 1, thr, iterations, coords, multiply, planes, func=func, **kwargs)
 
-            if size < 2:
-                raise CustomIndexError('when int or tuple, coords has to be greater than 1!', func, coords)
+    @inject_self
+    def minimum(
+        self,
+        clip: vs.VideoNode,
+        thr: float | None = None,
+        iterations: int = 1,
+        coords: Sequence[int] | None = None,
+        multiply: float | None = None,
+        planes: PlanesT = None,
+        *,
+        func: FuncExceptT | None = None,
+        **kwargs: Any
+    ) -> vs.VideoNode:
+        """
+        Replaces each pixel with the smallest value in its 3x3 neighbourhood.
+        This operation is also known as erosion with a radius of 1.
 
-            if not self._fast and size != 3:
-                raise CustomIndexError(
-                    'with fast=False or no akarin plugin, you must have coords=3!', func, coords
-                )
-        elif len(coords) != 8:
-            raise CustomIndexError('when a list, coords must contain exactly 8 numbers!', func, coords)
+        :param clip:            Clip to process.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the 3x3 neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value. This must contain exactly 8 numbers.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self.erosion(clip, 1, thr, iterations, coords, multiply, planes, func=func, **kwargs)
 
-        if thr is not None and thr < 0.0:
-            raise CustomIndexError('thr must be a positive number!', func, coords)
+    @inject_self
+    @copy_signature(_morpho_method)
+    def inflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces each pixel with the average of the (radius * 2 + 1) ** 2 - 1 pixels
+        in its (radius * 2 + 1)x(radius * 2 + 1) neighbourhood, but only if that average
+        is greater than the center pixel.
 
-        return self.func or func, self.planes if planes is None else planes
+        A radius of 1 will replace each pixel with the average of the 8 pixels in its 3x3 neighbourhood.
+        A radius of 2 will replace each pixel with the average of the 24 pixels in its 5x5 neighbourhood.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become greater than input + thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self._xxflate(*args, func=func or self.inflate, inflate=True, **kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def deflate(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces each pixel with the average of the (radius * 2 + 1) ** 2 - 1 pixels
+        in its (radius * 2 + 1)x(radius * 2 + 1) neighbourhood, but only if that average
+        is less than the center pixel.
+
+        A radius of 1 will replace each pixel with the average of the 8 pixels in its 3x3 neighbourhood.
+        A radius of 2 will replace each pixel with the average of the 24 pixels in its 5x5 neighbourhood.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self._xxflate(*args, func=func or self.deflate, inflate=False, **kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def dilation(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces each pixel with the largest value in its (radius * 2 + 1)x(radius * 2 + 1) neighbourhood.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self._mm_func(*args, func=func or self.dilation, mm_func=core.std.Maximum, op=ExprOp.MAX, **kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def erosion(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces each pixel with the smallest value in its (radius * 2 + 1)x(radius * 2 + 1) neighbourhood.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        return self._mm_func(*args, func=func or self.erosion, mm_func=core.std.Minimum, op=ExprOp.MIN, **kwargs)
+
+    @inject_self
+    @copy_signature(_xxpand_method)
+    def expand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces multiple times each pixel with the largest value in its 3x3 neighbourhood.
+        Specifying a mode will allow custom growing mode.
+
+        :param clip:            Clip to process.
+        :param sw:              Number of horizontal iterations.
+        :param sh:              Number of vertical iterations.
+        :param mode:            Specifies the expand mode shape.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param planes:          Which plane to process.
+        """
+        return self._xxpand_transform(clip, *args, op=ExprOp.MAX, func=func or self.expand, **kwargs)
+
+    @inject_self
+    @copy_signature(_xxpand_method)
+    def inpand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        Replaces multiple times each pixel with the smallest value in its 3x3 neighbourhood.
+        Specifying a mode will allow custom growing mode.
+
+        :param clip:            Clip to process.
+        :param sw:              Number of horizontal iterations.
+        :param sh:              Number of vertical iterations.
+        :param mode:            Specifies the expand mode shape.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param planes:          Which plane to process.
+        """
+        return self._xxpand_transform(clip, *args, op=ExprOp.MIN, func=func or self.inpand, **kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def closing(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        A closing is an dilation followed by an erosion.
+
+        :param clip:            Clip to process
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.closing
+
+        dilated = self.dilation(clip, *args, func=func, **kwargs)
+        eroded = self.erosion(dilated, *args, func=func, **kwargs)
+
+        return eroded
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def opening(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        An opening is an erosion followed by an dilation.
+
+        :param clip:            Clip to process
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.opening
+
+        eroded = self.erosion(clip, *args, func=func, **kwargs)
+        dilated = self.dilation(eroded, *args, func=func, **kwargs)
+
+        return dilated
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def gradient(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        A morphological gradient is the difference between a dilation and erosion.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.gradient
+
+        eroded = self.erosion(clip, *args, func=func, **kwargs)
+        dilated = self.dilation(clip, *args, func=func, **kwargs)
+
+        return norm_expr(
+            [dilated, eroded], 'x y -', kwargs.get('planes', args[5] if len(args) > 5 else None), func=func
+        )
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def top_hat(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        A top hat or a white hat is the difference of the original clip and the opening.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.top_hat
+
+        opened = self.opening(clip, *args, func=func, **kwargs)
+
+        return norm_expr(
+            [clip, opened], 'x y -', kwargs.get('planes', args[5] if len(args) > 5 else None), func=func
+        )
+
+    @copy_signature(top_hat)
+    @inject_self
+    def white_hate(self, *args: Any, **kwargs: Any) -> vs.VideoNode:
+        return self.top_hat(*args, **dict(func=self.white_hate) | kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def bottom_hat(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        A bottom hat or a black hat is the difference of the closing and the original clip.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.bottom_hat
+
+        closed = self.closing(clip, *args, func=func, **kwargs)
+
+        return norm_expr(
+            [closed, clip], 'x y -', kwargs.get('planes', args[5] if len(args) > 5 else None), func=func
+        )
+
+    @copy_signature(bottom_hat)
+    @inject_self
+    def black_hat(self, *args: Any, **kwargs: Any) -> vs.VideoNode:
+        return self.top_hat(*args, **dict(func=self.black_hat) | kwargs)
+
+    @inject_self
+    @copy_signature(_morpho_method)
+    def outer_hat(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        An outer hat is the difference of the dilation and the original clip.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.outer_hat
+
+        dilated = self.dilation(clip, *args, func=func, **kwargs)
+
+        return norm_expr(
+            [dilated, clip], 'x y -', kwargs.get('planes', args[5] if len(args) > 5 else None), func=func
+        )
+
+    @inject_self
+    def inner_hat(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
+        """
+        An inner hat is the difference of the original clip and the erosion.
+
+        :param clip:            Clip to process.
+        :param radius:          A single integer specifies the size of the square matrix.
+                                A tuple of an integer and a ConvMode allows specification
+                                of the matrix type dimension as well.
+        :param thr:             Threshold (32-bit scale) to limit how much pixels are changed.
+                                Output pixels will not become less than input - thr.
+                                The default is no limit.
+        :param iterations:      Number of times to execute the function.
+        :param coords:          Specifies which pixels from the neighbourhood are considered.
+                                If an element of this array is 0, the corresponding pixel is not considered
+                                when finding the maximum value.
+                                This must contain exactly (radius * 2 + 1) ** 2 - 1 numbers eg. 8, 24, 48...
+                                When specified, this parameter takes precedence over radius.
+        :param multiply:        Optional multiplier of the final value.
+        :param planes:          Which plane to process.
+        """
+        func = func or self.inner_hat
+
+        eroded = self.erosion(clip, *args, func=func, **kwargs)
+
+        return norm_expr(
+            [clip, eroded], 'x y -', kwargs.get('planes', args[5] if len(args) > 5 else None), func=func
+        )
+
+    @inject_self
+    def binarize(
+        self,
+        clip: vs.VideoNode,
+        midthr: float | list[float] | None = None,
+        lowval: float | list[float] | None = None,
+        highval: float | list[float] | None = None,
+        planes: PlanesT = None
+    ) -> vs.VideoNode:
+        """
+        Turns every pixel in the image into either lowval, if it's below midthr, or highval, otherwise.
+
+        :param clip:            Clip to process.
+        :param midthr:          Defaults to the middle point of range allowed by the format.
+                                Can be specified for each plane individually.
+        :param lowval:          Value given to pixels that are below threshold.
+                                Can be specified for each plane individually.
+                                Defaults to the lower bound of the format.
+        :param highval:         Value given to pixels that are greater than or equal to threshold.
+                                Defaults to the maximum value allowed by the format.
+                                Can be specified for each plane individually.
+                                Defaults to the upper bound of the format.
+        :param planes:          Specifies which planes will be processed.
+                                Any unprocessed planes will be simply copied.
+        """
+        midthr, lowval, highval = (
+            thr and list(
+                scale_value(t, 32, clip)
+                for t in to_arr(thr)
+            ) for thr in (midthr, lowval, highval)
+        )
+
+        return core.std.Binarize(clip, midthr, lowval, highval, planes)
 
     @classmethod
     def _morpho_xx_imum(
-        cls, src: vs.VideoNode, thr: float | None, op: Literal[ExprOp.MIN, ExprOp.MAX],
-        coords: CoordsT, multiply: float | None = None, clamp: bool = False
-    ) -> StrList:
-        exclude = list[tuple[int, int]]()
-
-        if isinstance(coords, (int, tuple)):
-            if isinstance(coords, tuple):
-                size, mode = coords
-            else:
-                size, mode = coords, ConvMode.HV
-
-            assert size > 1
-
-            radius = size // 2
-
-            if size % 2 == 0:
-                exclude.extend((x, radius) for x in range(-radius, radius + 1))
-                exclude.append((radius, radius - 1))
+        cls,
+        clip: vs.VideoNode,
+        radius: tuple[int, ConvMode],
+        thr: float | None,
+        coords: Sequence[int] | None,
+        multiply: float | None,
+        clamp: bool,
+        *,
+        op: Literal[ExprOp.MIN, ExprOp.MAX],
+        func: FuncExceptT
+    ) -> TupleExprList:
+        if coords:
+            _, expr = cls._get_matrix_from_coords(coords, func)
         else:
-            coords = list(coords)
-            coords.insert(len(coords) // 2, 1)
-            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.HV
+            expr = ExprOp.matrix('x', *radius, [(0, 0)])
 
-        matrix = ExprOp.matrix('x', radius, mode, exclude)
+        for e in expr:
+            e.extend([op] * e.mlength)
 
-        if not isinstance(coords, (int, tuple)):
-            matrix = ExprList([x for x, coord in zip(matrix, coords) if coord])
-
-        matrix = ExprList(interleave_arr(matrix, op * matrix.mlength, 2))
-
-        if thr is not None:
-            matrix.append('x', scale_value(thr, 32, src), ExprOp.SUB, ExprOp.MAX)
-
-        if multiply is not None:
-            matrix.append(multiply, ExprOp.MUL)
-
-        if clamp:
-            matrix.append(ExprOp.clamp())
-
-        return matrix
-
-    def _mm_func(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT,
-        mm_func: MorphoFunc, op: Literal[ExprOp.MIN, ExprOp.MAX], **kwargs: Any
-    ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coords, planes, func)
-
-        if self._fast:
-            mm_func = norm_expr  # type: ignore[assignment]
-            kwargs.update(expr=self._morpho_xx_imum(src, thr, op, coords, multiply))
-        elif isinstance(coords, (int, tuple)):
-            if isinstance(coords, tuple):
-                if coords[1] is not ConvMode.HV:
-                    raise CustomIndexError(
-                        'with fast=False or no akarin plugin, you must have ConvMode.HV!', func, coords
-                    )
-
-                coords = coords[0]
-
-            if coords != 3:
-                raise CustomIndexError(
-                    'with fast=False or no akarin plugin, you must have coords=3!', func, coords
-                )
-
-            kwargs.update(coordinates=[1] * 8)
-
-        if not self._fast:
             if thr is not None:
-                kwargs.update(threshold=scale_value(thr, 32, src))
+                e.append("x", scale_value(thr, 32, clip))
+                limit = (ExprOp.SUB, ExprOp.MAX) if op == ExprOp.MIN else (ExprOp.ADD, ExprOp.MIN)
+                e.append(*limit)
 
             if multiply is not None:
-                orig_mm_func = mm_func
+                e.append(multiply, ExprOp.MUL)
 
-                @copy_signature(mm_func)
-                def _mm_func(*args: Any, **kwargs: Any) -> Any:
-                    return orig_mm_func(*args, **kwargs).std.Expr(f'x {multiply} *')
+            if clamp:
+                e.append(ExprOp.clamp())
 
-                mm_func = _mm_func
+        return expr
 
-        return iterate(src, mm_func, radius, planes=planes, **kwargs)
-
-    @inject_self
-    def xxpand_transform(
-        self, clip: vs.VideoNode, op: Literal[ExprOp.MIN, ExprOp.MAX], sw: int, sh: int | None = None,
-        mode: XxpandMode = XxpandMode.RECTANGLE, thr: float | None = None,
-        planes: PlanesT = None, *, func: FuncExceptT | None = None
+    def _mm_func(
+        self,
+        clip: vs.VideoNode,
+        radius: RadiusT = 1,
+        thr: float | None = None,
+        iterations: int = 1,
+        coords: Sequence[int] | None = None,
+        multiply: float | None = None,
+        planes: PlanesT = None,
+        *,
+        func: FuncExceptT,
+        mm_func: VSFunctionAllArgs,
+        op: Literal[ExprOp.MIN, ExprOp.MAX],
+        **kwargs: Any
     ) -> vs.VideoNode:
-        func, planes = self._check_params(1, thr, 3, planes, func or self.xxpand_transform)
+        if isinstance(radius, tuple):
+            radius, conv_mode = radius
+        else:
+            conv_mode = ConvMode.SQUARE
 
+        if not complexpr_available:
+            if radius > 1:
+                raise CustomValueError('If akarin plugin is not available, you must have radius=1', func, radius)
+
+            if not coords:
+                match conv_mode:
+                    case ConvMode.VERTICAL:
+                        coords = Coordinates.VERTICAL
+                    case ConvMode.HORIZONTAL:
+                        coords = Coordinates.HORIZONTAL
+                    case ConvMode.HV:
+                        coords = Coordinates.DIAMOND
+                    case _:
+                        coords = Coordinates.RECTANGLE
+
+            if thr is not None:
+                kwargs.update(threshold=scale_mask(thr, 32, clip))
+
+            kwargs.update(coordinates=coords, planes=planes)
+
+            if multiply is not None:
+                mm_func = self._multiply_mm_func(mm_func, multiply)
+        else:
+            mm_func = cast(VSFunctionAllArgs, norm_expr)
+            kwargs.update(
+                expr=self._morpho_xx_imum(clip, (radius, conv_mode), thr, coords, multiply, False, op=op, func=func)
+            )
+
+        return iterate(clip, mm_func, iterations, **kwargs)
+
+    def _xxpand_transform(
+        self,
+        clip: vs.VideoNode,
+        sw: int, sh: int | None = None,
+        mode: XxpandMode = XxpandMode.RECTANGLE,
+        thr: float | None = None,
+        planes: PlanesT = None,
+        *,
+        op: Literal[ExprOp.MIN, ExprOp.MAX],
+        func: FuncExceptT,
+        **kwargs: Any
+    ) -> vs.VideoNode:
         sh = fallback(sh, sw)
-
-        if op not in {ExprOp.MIN, ExprOp.MAX}:
-            raise NotImplementedError
 
         function = self.maximum if op is ExprOp.MAX else self.minimum
 
@@ -188,221 +623,127 @@ class Morpho:
             else:
                 break
 
-            clip = function(clip, thr, coords, planes=planes, func=func)
+            clip = function(clip, thr, 1, coords, planes=planes, func=func, **kwargs)
 
         return clip
 
     def _xxflate(
-        self: Morpho, inflate: bool, src: vs.VideoNode, radius: int, planes: PlanesT, thr: float | None,
-        multiply: float | None, *, func: FuncExceptT
+        self,
+        clip: vs.VideoNode,
+        radius: RadiusT = 1,
+        thr: float | None = None,
+        iterations: int = 1,
+        coords: Sequence[int] | None = None,
+        multiply: float | None = None,
+        planes: PlanesT = None,
+        *,
+        func: FuncExceptT,
+        inflate: bool,
+        **kwargs: Any
     ) -> vs.VideoNode:
-        assert check_variable(src, func)
+        if isinstance(radius, tuple):
+            radius, conv_mode = radius
+        else:
+            conv_mode = ConvMode.SQUARE
 
-        expr = ExprOp.matrix('x', radius, exclude=[(0, 0)])
+        xxflate_func: VSFunctionAllArgs
 
-        conv_len = len(expr)
+        if not complexpr_available:
+            if radius > 1 or conv_mode != ConvMode.SQUARE:
+                raise CustomValueError(
+                    'If akarin plugin is not available, you must have radius=1 and ConvMode.SQUARE',
+                    func, (radius, conv_mode)
+                )
 
-        expr.append(ExprOp.ADD * expr.mlength)
+            if coords:
+                raise CustomValueError(
+                    "If akarin plugin is not available, you can't have custom coordinates", func, coords
+                )
 
-        if src.format.sample_type is vs.INTEGER:
-            expr.append(radius * 4, ExprOp.ADD)
+            xxflate_func = core.std.Inflate if inflate else core.std.Deflate
+            kwargs.update(planes=planes)
 
-        expr.append(conv_len, ExprOp.DIV)
-        expr.append('x', ExprOp.MAX if inflate else ExprOp.MIN)
+            if thr is not None:
+                kwargs.update(threshold=scale_mask(thr, 32, clip))
 
-        if thr is not None:
-            thr = scale_value(thr, 32, src)
-            limit = ['x', thr, ExprOp.ADD] if inflate else ['x', thr, ExprOp.SUB, ExprToken.RangeMin, ExprOp.MAX]
+            if multiply is not None:
+                xxflate_func = self._multiply_mm_func(xxflate_func, multiply)
+        else:
+            if coords:
+                radius, expr = self._get_matrix_from_coords(coords, func)
+            else:
+                expr = ExprOp.matrix('x', radius, conv_mode, exclude=[(0, 0)])
 
-            expr.append(limit, ExprOp.MIN if inflate else ExprOp.MAX)
+            for e in expr:
+                e.append(ExprOp.ADD * e.mlength, len(e), ExprOp.DIV, 'x', ExprOp.MAX if inflate else ExprOp.MIN)
 
-        if multiply is not None:
-            expr.append(multiply, ExprOp.MUL)
+                if thr is not None:
+                    thr = scale_value(thr, 32, clip)
+                    limit = ['x', thr, ExprOp.ADD, ExprOp.MIN] if inflate else ['x', thr, ExprOp.SUB, ExprOp.MAX]
+                    e.append(limit)
 
-        return norm_expr(src, expr, planes)
+                if multiply is not None:
+                    e.append(multiply, ExprOp.MUL)
 
-    @inject_self
-    @copy_signature(_minmax_method)
-    def maximum(
-        self, src: vs.VideoNode, thr: float | None = None, coords: CoordsT | None = None,
-        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        return self.dilation(src, iterations, planes, thr, coords or ([1] * 8), multiply, func=func, **kwargs)
+            kwargs.update(expr=expr)
 
-    @inject_self
-    @copy_signature(_minmax_method)
-    def minimum(
-        self, src: vs.VideoNode, thr: float | None = None, coords: CoordsT | None = None,
-        iterations: int = 1, multiply: float | None = None, planes: PlanesT = None,
-        *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        return self.erosion(src, iterations, planes, thr, coords or ([1] * 8), multiply, func=func, **kwargs)
+            xxflate_func = cast(VSFunctionAllArgs, norm_expr)
 
-    @inject_self
-    def inflate(
-        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
-    ) -> vs.VideoNode:
-        for _ in range(iterations):
-            src = self._xxflate(True, src, radius, planes, thr, multiply, func=func or self.inflate)
-        return src
+        return iterate(clip, xxflate_func, iterations, **kwargs)
 
-    @inject_self
-    def deflate(
-        self: Morpho, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        iterations: int = 1, multiply: float | None = None, *, func: FuncExceptT | None = None
-    ) -> vs.VideoNode:
-        for _ in range(iterations):
-            src = self._xxflate(False, src, radius, planes, thr, multiply, func=func or self.deflate)
-        return src
+    def _multiply_mm_func(self, func: VSFunctionAllArgs, multiply: float) -> VSFunctionAllArgs:
+        def mm_func(clip: vs.VideoNode, *args: Any, **kwargs: Any) -> vs.VideoNode:
+            return func(clip, *args, **kwargs).std.Expr(f'x {multiply} *')
+        return mm_func
 
-    @inject_self
-    @copy_signature(_morpho_method)
-    def dilation(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self._mm_func(*args, func=func or self.dilation, mm_func=core.std.Maximum, op=ExprOp.MAX, **kwargs)
+    @staticmethod
+    def _get_matrix_from_coords(coords: Sequence[int], func: FuncExceptT) -> tuple[int, TupleExprList]:
+        lc = len(coords)
 
-    @inject_self
-    @copy_signature(_morpho_method)
-    def erosion(self, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self._mm_func(*args, func=func or self.erosion, mm_func=core.std.Minimum, op=ExprOp.MIN, **kwargs)
+        if lc < 8:
+            raise CustomValueError('coords must have more than 8 elements!', func, coords)
 
-    @inject_self
-    @copy_signature(_morpho_method2)
-    def expand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self.xxpand_transform(clip, ExprOp.MAX, *args, func=func, **kwargs)
+        sq_lc = sqrt(lc + 1)
 
-    @inject_self
-    @copy_signature(_morpho_method2)
-    def inpand(self, clip: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        return self.xxpand_transform(clip, ExprOp.MIN, *args, func=func, **kwargs)
-
-    @inject_self
-    @copy_signature(_morpho_method)
-    def closing(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        func = func or self.closing
-
-        dilated = self.dilation(src, *args, func=func, **kwargs)
-        eroded = self.erosion(dilated, *args, func=func, **kwargs)
-
-        return eroded
-
-    @inject_self
-    @copy_signature(_morpho_method)
-    def opening(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        func = func or self.closing
-
-        eroded = self.erosion(src, *args, func=func, **kwargs)
-        dilated = self.dilation(eroded, *args, func=func, **kwargs)
-
-        return dilated
-
-    @inject_self
-    def gradient(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coords, planes, func or self.gradient)
-
-        if radius == 1 and self._fast:
-            return norm_expr(
-                src, '{dilated} {eroded} - {multiply}', planes,
-                dilated=self._morpho_xx_imum(src, thr, ExprOp.MAX, coords, None, True),
-                eroded=self._morpho_xx_imum(src, thr, ExprOp.MIN, coords, None, True),
-                multiply='' if multiply is None else f'{multiply} *'
+        if not (sq_lc.is_integer() and sq_lc % 2 != 0):
+            raise CustomValueError(
+                'coords must contain exactly (radius * 2 + 1) ** 2 - 1 numbers.\neg. 8, 24, 48...', func, coords
             )
 
-        eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
-        dilated = self.dilation(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
+        coords = list(coords)
+        coords.insert(lc // 2, 1)
 
-        return norm_expr([dilated, eroded], 'x y -', planes)
+        r = int(sq_lc // 2)
 
-    @inject_self
-    @copy_signature(_morpho_method)
-    def top_hat(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        opened = self.opening(src, *args, func=func or self.top_hat, **kwargs)
+        expr, = ExprOp.matrix("x", r, ConvMode.SQUARE, exclude=[(0, 0)])
+        expr = ExprList([x for x, coord in zip(expr, coords) if coord])
 
-        return norm_expr([src, opened], 'x y -', kwargs.get('planes', args[1] if len(args) > 1 else None))
-
-    @inject_self
-    @copy_signature(_morpho_method)
-    def black_hat(self, src: vs.VideoNode, *args: Any, func: FuncExceptT | None = None, **kwargs: Any) -> vs.VideoNode:
-        closed = self.closing(src, *args, func=func or self.black_hat, **kwargs)
-
-        return norm_expr([closed, src], 'x y -', kwargs.get('planes', args[1] if len(args) > 1 else None))
-
-    @inject_self
-    def outer_hat(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coords, planes, func or self.outer_hat)
-
-        if radius == 1 and self._fast:
-            return norm_expr(
-                src, '{dilated} {multiply} x -', planes,
-                dilated=self._morpho_xx_imum(src, thr, ExprOp.MAX, coords, None, True),
-                multiply='' if multiply is None else f'{multiply} *'
-            )
-
-        dilated = self.dilation(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
-
-        return norm_expr([dilated, src], 'x y -', planes)
-
-    @inject_self
-    def inner_hat(
-        self, src: vs.VideoNode, radius: int = 1, planes: PlanesT = None, thr: float | None = None,
-        coords: CoordsT = 5, multiply: float | None = None, *, func: FuncExceptT | None = None, **kwargs: Any
-    ) -> vs.VideoNode:
-        func, planes = self._check_params(radius, thr, coords, planes, func or self.inner_hat)
-
-        if radius == 1 and self._fast:
-            return norm_expr(
-                src, '{eroded} {multiply} x -', planes,
-                eroded=self._morpho_xx_imum(src, thr, ExprOp.MIN, coords),
-                multiply='' if multiply is None else f'{multiply} *'
-            )
-
-        eroded = self.erosion(src, radius, planes, thr, coords, multiply, func=func, **kwargs)
-
-        return norm_expr([src, eroded], 'x y -', planes)
-
-    @inject_self
-    def binarize(
-        self, src: vs.VideoNode, midthr: float | list[float] | None = None,
-        lowval: float | list[float] | None = None, highval: float | list[float] | None = None,
-        planes: PlanesT = None
-    ) -> vs.VideoNode:
-        midthr, lowval, highval = (
-            thr and list(
-                scale_value(t, 32, src)
-                for i, t in enumerate(to_arr(thr))
-            ) for thr in (midthr, lowval, highval)
-        )
-
-        return src.std.Binarize(midthr, lowval, highval, planes)
+        return r, TupleExprList([expr])
 
 
 def grow_mask(
-    mask: vs.VideoNode, radius: int = 1, multiply: float = 1.0,
-    planes: PlanesT = None, coords: CoordsT = 5, thr: float | None = None,
-    *, func: FuncExceptT | None = None, **kwargs: Any
+    clip: vs.VideoNode,
+    radius: RadiusT = 1,
+    thr: float | None = None,
+    iterations: int = 1,
+    coords: Sequence[int] | None = None,
+    multiply: float | None = None,
+    planes: PlanesT = None,
+    *,
+    func: FuncExceptT | None = None,
+    **kwargs: Any
 ) -> vs.VideoNode:
     func = func or grow_mask
 
-    assert check_variable(mask, func)
+    morpho = Morpho()
 
-    morpho = Morpho(planes, func)
-
-    kwargs.update(thr=thr, coords=coords)
-
-    closed = morpho.closing(mask, **kwargs)
-    dilated = morpho.dilation(closed, **kwargs)
-    outer = morpho.outer_hat(dilated, radius, **kwargs)
+    closed = morpho.closing(clip, radius, thr, iterations, coords, multiply, planes, func=func, **kwargs)
+    dilated = morpho.dilation(closed, radius, thr, iterations, coords, multiply, planes, func=func, **kwargs)
+    outer = morpho.outer_hat(dilated, radius, thr, iterations, coords, multiply, planes, func=func, **kwargs)
 
     blurred = BlurMatrix.BINOMIAL()(outer, planes=planes)
 
-    if multiply != 1.0:
+    if multiply:
         return blurred.std.Expr(f'x {multiply} *')
 
     return blurred
