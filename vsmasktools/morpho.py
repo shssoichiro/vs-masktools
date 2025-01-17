@@ -90,7 +90,7 @@ class Morpho:
             if isinstance(coords, tuple):
                 size, mode = coords
             else:
-                size, mode = coords, ConvMode.HV
+                size, mode = coords, ConvMode.SQUARE
 
             assert size > 1
 
@@ -102,7 +102,7 @@ class Morpho:
         else:
             coords = list(coords)
             coords.insert(len(coords) // 2, 1)
-            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.HV
+            radius, mode = floor(sqrt(len(coords)) / 2), ConvMode.SQUARE
 
         matrix = ExprOp.matrix('x', radius, mode, exclude)
 
