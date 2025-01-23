@@ -6,7 +6,7 @@ from vsexprtools import ExprOp, ExprToken, norm_expr
 from vsrgtools import BlurMatrix, gauss_blur
 from vstools import (
     ColorRange, ConvMode, CustomEnum, VSFunctionAllArgs, check_variable, depth, get_peak_value,
-    get_y, plane, scale_mask, scale_value, vs
+    get_y, plane, scale_mask, scale_value, scale_delta, vs
 )
 
 from .details import multi_detail_mask
@@ -135,7 +135,7 @@ class _dre_edgemask(CustomEnum):
         if self is self.CLAHE:  # type: ignore
             limit, tile = kwargs.get('limit', 0.0305), kwargs.get('tile', 5)
 
-            return depth(depth(clip, 16).ehist.CLAHE(scale_value(limit, 32, 16), tile), clip)
+            return depth(depth(clip, 16).vszip.CLAHE(scale_delta(limit, 32, 16), tile), clip)
 
         return clip
 
