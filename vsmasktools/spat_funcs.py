@@ -153,7 +153,7 @@ def flat_mask(src: vs.VideoNode, radius: int = 5, thr: float = 0.011, gauss: boo
 
     blur, mask = depth(blur, 8), depth(luma, 8)
 
-    mask = mask.abrz.AdaptiveBinarize(blur, scale_value(thr, 32, blur))
+    mask = mask.vszip.AdaptiveBinarize(blur, scale_value(thr, 32, blur))
 
     return depth(mask, luma, dither_type=DitherType.NONE, range_in=ColorRange.FULL, range_out=ColorRange.FULL)
 
