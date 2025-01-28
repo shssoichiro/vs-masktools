@@ -5,7 +5,7 @@ from typing import Sequence, overload
 from vsexprtools import ExprOp, ExprVars, complexpr_available, norm_expr
 from vsrgtools import box_blur, gauss_blur
 from vstools import (
-    ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, fallback,
+    ColorRange, CustomRuntimeError, DitherType, FuncExceptT, StrList, check_variable, core, depth, fallback, get_depth,
     get_lowest_value, get_peak_value, get_sample_type, get_y, plane, scale_value, to_arr, vs
 )
 
@@ -87,7 +87,7 @@ def adg_mask(
 def retinex(
     clip: vs.VideoNode, sigma: Sequence[float] = [25, 80, 250],
     lower_thr: float = 0.001, upper_thr: float = 0.001,
-    fast: bool | None = None, func: FuncExceptT | None = None
+    fast: bool = True, func: FuncExceptT | None = None
 ) -> vs.VideoNode:
     func = func or retinex
 
@@ -97,16 +97,22 @@ def retinex(
 
     y = get_y(clip)
 
-    if not complexpr_available or not hasattr(core, 'vszip'):
-        if fast:
-            raise CustomRuntimeError(
-                "You don't have {missing} plugin, you can't use this function!", func, 'fast=True',
-                missing=iter(x for x in ('akarin', 'vszip') if not hasattr(core, x))
-            )
-
+    if get_depth(y) <= 16 and get_sample_type(y) is vs.INTEGER:
+        # retinex plugin is currently an order of magnitude faster,
+        # but only supports 8-16 bit integer formats.
+        #
+        # The cause of the slowness is `gauss_blur`,
+        # so we should revisit this if an alternative or speedup
+        # to `gauss_blur` is found.
         return y.retinex.MSRCP(sigma, lower_thr, upper_thr)
-    elif fast is None:
-        fast = True
+
+    if not complexpr_available or not hasattr(core, "vszip"):
+        raise CustomRuntimeError(
+            "You don't have {missing} plugin, you can't use this function!",
+            func,
+            "bit depth > 16",
+            missing=iter(x for x in ("akarin", "vszip") if not hasattr(core, x)),
+        )
 
     y = y.std.PlaneStats()
     is_float = get_sample_type(y) is vs.FLOAT
